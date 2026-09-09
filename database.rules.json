@@ -1,0 +1,74 @@
+{
+  "rules": {
+    "sessions": {
+      "main": {
+        "teams": {
+          "$team": {
+            ".read": "auth != null",
+            "cap": { ".write": "auth != null" },
+            "startCap": { ".write": "auth != null" },
+            "signings": { ".write": "auth != null" },
+            "claimedBy": { ".write": "auth != null" }
+          }
+        },
+        "rfa": {
+          "activePlayerId": { ".read": "auth != null", ".write": "auth != null" },
+          "players": {
+            "$pid": {
+              "round": { ".read": "auth != null", ".write": "auth != null" },
+              "revealed": { ".read": "auth != null", ".write": "auth != null" },
+              "done": { ".read": "auth != null", ".write": "auth != null" },
+              "result": { ".read": "auth != null", ".write": "auth != null" },
+              "bids": {
+                "$round": {
+                  "$team": {
+                    "status": {
+                      ".read": "auth != null",
+                      ".write": "auth != null && auth.uid === root.child('sessions/main/teams').child($team).child('claimedBy').val()"
+                    },
+                    "amount": {
+                      ".read": "auth != null && (root.child('sessions/main/rfa/players').child($pid).child('revealed').child($round).val() === true || auth.uid === root.child('sessions/main/teams').child($team).child('claimedBy').val())",
+                      ".write": "auth != null && auth.uid === root.child('sessions/main/teams').child($team).child('claimedBy').val()"
+                    },
+                    "years": {
+                      ".read": "auth != null && (root.child('sessions/main/rfa/players').child($pid).child('revealed').child($round).val() === true || auth.uid === root.child('sessions/main/teams').child($team).child('claimedBy').val())",
+                      ".write": "auth != null && auth.uid === root.child('sessions/main/teams').child($team).child('claimedBy').val()"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "fa": {
+          "activePlayerId": { ".read": "auth != null", ".write": "auth != null" },
+          "customPlayers": { ".read": "auth != null", ".write": "auth != null" },
+          "players": {
+            "$pid": {
+              "isRookie": { ".read": "auth != null", ".write": "auth != null" },
+              "revealed": { ".read": "auth != null", ".write": "auth != null" },
+              "done": { ".read": "auth != null", ".write": "auth != null" },
+              "result": { ".read": "auth != null", ".write": "auth != null" },
+              "offers": {
+                "$team": {
+                  "status": {
+                    ".read": "auth != null",
+                    ".write": "auth != null && auth.uid === root.child('sessions/main/teams').child($team).child('claimedBy').val()"
+                  },
+                  "amount": {
+                    ".read": "auth != null && (root.child('sessions/main/fa/players').child($pid).child('revealed').val() === true || auth.uid === root.child('sessions/main/teams').child($team).child('claimedBy').val())",
+                    ".write": "auth != null && auth.uid === root.child('sessions/main/teams').child($team).child('claimedBy').val()"
+                  },
+                  "years": {
+                    ".read": "auth != null && (root.child('sessions/main/fa/players').child($pid).child('revealed').val() === true || auth.uid === root.child('sessions/main/teams').child($team).child('claimedBy').val())",
+                    ".write": "auth != null && auth.uid === root.child('sessions/main/teams').child($team).child('claimedBy').val()"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

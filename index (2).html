@@ -1,0 +1,826 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Premier GM League — Offseason War Room</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#0A1220;
+    --panel:#101A2E;
+    --panel-raised:#16213A;
+    --line:#26334D;
+    --gold:#C6A15B;
+    --gold-bright:#E9C77E;
+    --turf:#3C7A5C;
+    --turf-bright:#4F9975;
+    --alert:#C1503F;
+    --alert-bright:#DD6A56;
+    --paper:#EDE7D8;
+    --muted:#8592AC;
+    --muted-dim:#56617A;
+    --shadow: 0 20px 50px -20px rgba(0,0,0,.6);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      radial-gradient(1200px 600px at 15% -10%, rgba(198,161,91,.07), transparent 60%),
+      radial-gradient(1000px 500px at 100% 0%, rgba(60,122,92,.08), transparent 55%),
+      var(--ink);
+    color:var(--paper);
+    font-family:'Inter',sans-serif;
+    min-height:100vh;
+    -webkit-font-smoothing:antialiased;
+  }
+  ::selection{background:var(--gold);color:var(--ink);}
+  h1,h2,h3,.display{font-family:'Oswald',sans-serif;text-transform:uppercase;letter-spacing:.03em;}
+  .mono{font-family:'JetBrains Mono',monospace;font-variant-numeric:tabular-nums;}
+  a{color:inherit;}
+  button{font-family:'Inter',sans-serif;cursor:pointer;}
+  button:focus-visible, input:focus-visible, select:focus-visible{
+    outline:2px solid var(--gold-bright); outline-offset:2px;
+  }
+
+  .topbar{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:16px 28px;
+    border-bottom:1px solid var(--line);
+    background:linear-gradient(180deg, rgba(16,26,46,.9), rgba(16,26,46,.55));
+    position:sticky;top:0;z-index:40;backdrop-filter:blur(6px);
+    flex-wrap:wrap;gap:10px;
+  }
+  .brand{display:flex;align-items:center;gap:14px;}
+  .brand .crest{
+    width:38px;height:38px;border-radius:4px;
+    border:1px solid var(--gold);
+    display:flex;align-items:center;justify-content:center;
+    font-family:'Oswald',sans-serif;font-weight:700;color:var(--gold-bright);
+    font-size:15px;letter-spacing:0;
+    background:linear-gradient(180deg, rgba(198,161,91,.12), transparent);
+  }
+  .brand-text .eyebrow{font-size:10px;letter-spacing:.18em;color:var(--muted);font-family:'Inter',sans-serif;text-transform:uppercase;}
+  .brand-text h1{font-size:19px;margin:0;color:var(--paper);}
+  .nav{display:flex;gap:6px;align-items:center;}
+  .nav button{
+    background:transparent;border:1px solid transparent;color:var(--muted);
+    padding:9px 16px;border-radius:6px;font-size:13px;font-weight:600;
+    letter-spacing:.02em; transition:.15s;
+  }
+  .nav button:hover{color:var(--paper);border-color:var(--line);}
+  .nav button.active{color:var(--ink);background:var(--gold);}
+  .me-badge{
+    display:flex;align-items:center;gap:10px;font-size:12px;color:var(--muted);
+    padding:7px 12px;border:1px solid var(--line);border-radius:100px;
+  }
+  .me-badge b{color:var(--gold-bright);font-family:'Oswald',sans-serif;letter-spacing:.02em;}
+  .me-badge a{color:var(--muted);text-decoration:underline;cursor:pointer;font-size:11px;}
+  .conn-dot{width:8px;height:8px;border-radius:50%;background:var(--turf-bright);display:inline-block;}
+  .conn-dot.off{background:var(--alert-bright);}
+
+  .ticker-wrap{border-bottom:1px solid var(--line);background:var(--panel);overflow-x:auto;position:sticky; top:65px; z-index:39;}
+  .ticker{display:flex;min-width:max-content;}
+  .ticker-tile{padding:10px 20px;border-right:1px solid var(--line);display:flex;flex-direction:column;gap:2px;min-width:132px;transition:.15s;}
+  .ticker-tile:hover{background:var(--panel-raised);}
+  .ticker-tile .tname{font-size:10.5px;letter-spacing:.06em;color:var(--muted);text-transform:uppercase;font-weight:600;}
+  .ticker-tile .tcap{font-family:'JetBrains Mono',monospace;font-size:17px;font-weight:600;color:var(--gold-bright);}
+  .ticker-tile .tcap.low{color:var(--alert-bright);}
+  .ticker-tile .tsub{font-size:10px;color:var(--muted-dim);}
+
+  .wrap{max-width:1180px;margin:0 auto;padding:34px 28px 90px;}
+  .section-head{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;gap:10px;}
+  .section-head h2{font-size:26px;margin:0;color:var(--paper);}
+  .section-head .desc{color:var(--muted);font-size:13px;max-width:560px;}
+
+  .plaque{position:relative;background:linear-gradient(180deg, var(--panel-raised), var(--panel));border:1px solid var(--line);border-radius:10px;padding:28px;box-shadow:var(--shadow);}
+  .plaque::before,.plaque::after,.plaque .bc2,.plaque .bc3{content:"";position:absolute;width:16px;height:16px;border-color:var(--gold);}
+  .plaque::before{top:-1px;left:-1px;border-top:2px solid;border-left:2px solid;border-top-left-radius:6px;}
+  .plaque::after{top:-1px;right:-1px;border-top:2px solid;border-right:2px solid;border-top-right-radius:6px;}
+  .plaque .bc2{bottom:-1px;left:-1px;border-bottom:2px solid;border-left:2px solid;border-bottom-left-radius:6px;}
+  .plaque .bc3{bottom:-1px;right:-1px;border-bottom:2px solid;border-right:2px solid;border-bottom-right-radius:6px;}
+
+  .grid-2{display:grid;grid-template-columns:1.15fr .85fr;gap:22px;}
+  @media (max-width:900px){.grid-2{grid-template-columns:1fr;}}
+  .grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;}
+  @media (max-width:760px){.grid-3{grid-template-columns:1fr;}}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:20px;}
+
+  .team-card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px 18px;display:flex;flex-direction:column;gap:8px;}
+  .team-card.mine{border-color:var(--gold);}
+  .team-card .row1{display:flex;justify-content:space-between;align-items:baseline;}
+  .team-card .owner{font-family:'Oswald',sans-serif;font-size:15px;letter-spacing:.02em;}
+  .team-card .cap{font-family:'JetBrains Mono',monospace;font-size:22px;color:var(--gold-bright);font-weight:600;}
+  .team-card .barbg{height:5px;border-radius:3px;background:var(--line);overflow:hidden;}
+  .team-card .barfg{height:100%;background:linear-gradient(90deg,var(--turf),var(--gold));}
+  .team-card .meta{font-size:11px;color:var(--muted);display:flex;justify-content:space-between;}
+
+  .btn{border:1px solid var(--gold); background:var(--gold); color:var(--ink);padding:12px 22px;border-radius:7px;font-weight:700;font-size:13.5px;letter-spacing:.03em;transition:.15s; text-transform:uppercase;}
+  .btn:hover{background:var(--gold-bright);}
+  .btn.ghost{background:transparent;color:var(--gold-bright);}
+  .btn.ghost:hover{background:rgba(198,161,91,.1);}
+  .btn.turf{background:var(--turf);border-color:var(--turf);color:#eafff2;}
+  .btn.turf:hover{background:var(--turf-bright);}
+  .btn.alert{background:var(--alert);border-color:var(--alert);color:#fff0ee;}
+  .btn.alert:hover{background:var(--alert-bright);}
+  .btn.small{padding:8px 14px;font-size:12px;border-radius:6px;}
+  .btn:disabled{opacity:.35;cursor:not-allowed;}
+  .btn.block{width:100%;}
+
+  input[type=number],input[type=text],select{background:var(--ink);border:1px solid var(--line);color:var(--paper);padding:10px 12px;border-radius:6px;font-family:'JetBrains Mono',monospace;font-size:14px;width:100%;}
+  input[type=text]{font-family:'Inter',sans-serif;}
+  label{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);display:block;margin-bottom:6px;font-weight:600;}
+
+  .player-head{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;margin-bottom:18px;}
+  .player-name{font-size:32px;margin:2px 0 4px;color:var(--paper);}
+  .player-sub{font-size:12.5px;color:var(--muted);font-family:'JetBrains Mono',monospace;}
+  .eyebrow-label{font-size:10.5px;letter-spacing:.14em;color:var(--gold-bright);text-transform:uppercase;font-weight:700;margin-bottom:6px;}
+
+  .led{font-family:'JetBrains Mono',monospace;font-weight:700;color:var(--gold-bright);text-shadow:0 0 18px rgba(233,199,126,.35);letter-spacing:.02em;}
+  .led-lg{font-size:46px;}
+
+  .bid-tiles,.offer-tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px;margin-top:14px;}
+  .bid-tile,.offer-tile{background:var(--ink);border:1px solid var(--line);border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:8px;}
+  .bid-tile.locked,.offer-tile.locked{border-color:var(--turf);}
+  .bid-tile.passed,.offer-tile.passed{opacity:.5;}
+  .bid-tile.mine,.offer-tile.mine{border-color:var(--gold);}
+  .bid-tile .who,.offer-tile .who{font-size:11.5px;font-weight:600;letter-spacing:.02em;}
+  .bid-tile .amt,.offer-tile .offer-readout{font-family:'JetBrains Mono',monospace;font-size:18px;color:var(--gold-bright);}
+  .fields{display:grid;grid-template-columns:1fr 64px;gap:6px;}
+  .fields input,.fields select{padding:8px;font-size:12.5px;}
+  .btnrow{display:flex;gap:6px;}
+
+  .hairline{border:none;border-top:1px solid var(--line);margin:22px 0;}
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  th{text-align:left;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:8px 10px;border-bottom:1px solid var(--line);font-weight:600;}
+  td{padding:9px 10px;border-bottom:1px solid rgba(38,51,77,.6);}
+  tr:hover td{background:rgba(255,255,255,.02);}
+  .tag{display:inline-block;padding:2px 8px;border-radius:100px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;}
+  .tag.rfa-keep{background:rgba(60,122,92,.18);color:var(--turf-bright);}
+  .tag.rfa-lost{background:rgba(193,80,63,.18);color:var(--alert-bright);}
+  .tag.fa{background:rgba(198,161,91,.18);color:var(--gold-bright);}
+
+  .queue-item{display:flex;justify-content:space-between;align-items:center;padding:11px 12px;border-radius:7px;border:1px solid transparent;cursor:pointer;}
+  .queue-item:hover{background:var(--panel-raised);}
+  .queue-item.done{opacity:.4;}
+  .queue-item .qname{font-size:13px;font-weight:600;}
+  .queue-item .qsub{font-size:10.5px;color:var(--muted);font-family:'JetBrains Mono',monospace;}
+  .queue-item.active{border-color:var(--gold);background:rgba(198,161,91,.08);}
+
+  .empty{text-align:center;padding:60px 20px;color:var(--muted);}
+  .empty .display{font-size:22px;color:var(--paper);margin-bottom:8px;}
+  .search-box{position:relative;margin-bottom:12px;}
+  .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--panel-raised);border:1px solid var(--gold);color:var(--paper);padding:12px 20px;border-radius:8px;font-size:13px;box-shadow:var(--shadow);z-index:99;display:none;max-width:90vw;text-align:center;}
+  .scroll-list{max-height:520px;overflow-y:auto;padding-right:4px;}
+  .scroll-list::-webkit-scrollbar{width:7px;}
+  .scroll-list::-webkit-scrollbar-thumb{background:var(--line);border-radius:4px;}
+  .discount-note{font-size:11.5px;color:var(--muted);margin-top:6px;font-family:'JetBrains Mono',monospace;}
+  .badge-round{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--ink);background:var(--gold);padding:3px 9px;border-radius:100px;font-weight:700;}
+
+  /* login gate */
+  #loginGate{
+    position:fixed;inset:0;background:var(--ink);z-index:100;
+    display:flex;align-items:center;justify-content:center;padding:20px;
+  }
+  .login-card{max-width:560px;width:100%;}
+  .team-pick{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:20px;}
+  @media (max-width:520px){.team-pick{grid-template-columns:1fr;}}
+  .team-pick button{
+    text-align:left;background:var(--panel);border:1px solid var(--line);border-radius:9px;
+    padding:14px 16px;color:var(--paper);display:flex;flex-direction:column;gap:4px;
+  }
+  .team-pick button:hover{border-color:var(--gold);}
+  .team-pick .tn{font-family:'Oswald',sans-serif;font-size:15px;}
+  .team-pick .ts{font-size:11px;color:var(--muted);font-family:'JetBrains Mono',monospace;}
+  .waiting-note{color:var(--muted);font-size:13px;text-align:center;padding:20px;}
+</style>
+</head>
+<body>
+
+<div id="loginGate">
+  <div class="login-card plaque">
+    <div class="bc2"></div><div class="bc3"></div>
+    <div class="eyebrow-label">Premier GM League</div>
+    <h2 style="margin:2px 0 6px;font-size:26px;">Who's Picking?</h2>
+    <p style="color:var(--muted);font-size:13px;margin:0;">Click your team to enter. This is remembered on this device — if you close the tab or switch devices, just come back and click your name again.</p>
+    <div class="team-pick" id="teamPick"></div>
+  </div>
+</div>
+
+<div class="topbar" style="display:none;" id="topbar">
+  <div class="brand">
+    <div class="crest">PGL</div>
+    <div class="brand-text">
+      <div class="eyebrow">Premier GM League</div>
+      <h1>Offseason War Room</h1>
+    </div>
+  </div>
+  <div class="nav" id="nav"></div>
+  <div class="me-badge"><span class="conn-dot" id="connDot"></span> Playing as <b id="meLabel"></b> <a onclick="switchTeam()">switch</a></div>
+</div>
+
+<div class="ticker-wrap" style="display:none;" id="tickerWrap"><div class="ticker" id="ticker"></div></div>
+
+<div class="wrap" id="app" style="display:none;"></div>
+<div class="toast" id="toast"></div>
+
+<script type="module">
+/* =========================================================
+   FIREBASE SETUP — fill in your project config below
+   ========================================================= */
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
+import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
+import { getDatabase, ref, onValue, set, update, get, runTransaction, onDisconnect } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-database.js";
+
+const firebaseConfig = {
+  apiKey: "REPLACE_ME",
+  authDomain: "REPLACE_ME.firebaseapp.com",
+  databaseURL: "https://REPLACE_ME-default-rtdb.firebaseio.com",
+  projectId: "REPLACE_ME",
+  storageBucket: "REPLACE_ME.appspot.com",
+  messagingSenderId: "REPLACE_ME",
+  appId: "REPLACE_ME"
+};
+
+const fbApp = initializeApp(firebaseConfig);
+const auth = getAuth(fbApp);
+const db = getDatabase(fbApp);
+const ROOT = "sessions/main"; // single shared draft session
+
+let myUid = null;
+let myTeam = localStorage.getItem('pgl_team') || null;
+
+/* =========================================================
+   STATIC DATA (identical on every client)
+   ========================================================= */
+const OWNERS = {
+  IAN:"Ian Zimmerman", RYAN:"Ryan Zimmerman", PAUL:"Paul Limone", JIMMY:"Jimmy Wheeler",
+  FINCHER:"Alan Fincher", COLLIN:"Collin Allison", BUB:"Bub Hunter", JOSH:"Josh Yoakum"
+};
+const START_CAP = { COLLIN:59.4, IAN:129, JIMMY:132.4, RYAN:109.4, FINCHER:61.25, BUB:79.7, PAUL:100.4, JOSH:84.4 };
+
+const RFA_RAW = [
+["IAN","Bijan Robinson","ATL","RB",25],["IAN","Jahmyr Gibbs","DET","RB",21.25],
+["RYAN","Quentin Johnston","LAC","WR",15],["RYAN","Jaxon Smith-Njigba","SEA","WR",12.5],
+["RYAN","Bryce Young","CAR","QB",11.25],["PAUL","Zach Charbonnet","SEA","RB",10],
+["JIMMY","C.J. Stroud","HOU","QB",7.5],["FINCHER","Jordan Addison","MIN","WR",6.25],
+["RYAN","Zay Flowers","BAL","WR",6.25],["JOSH","De'Von Achane","MIA","RB",5],
+["BUB","Kendre Miller","NOS","RB",3.75],["COLLIN","Michael Mayer","LVR","TE",3.75],
+["RYAN","Dalton Kincaid","BUF","TE",3.75],["JIMMY","Rashee Rice","KC","WR",2.5],
+["BUB","Tank Bigsby","JAX","RB",1.25],["COLLIN","Josh Downs","IND","WR",1.25],
+["FINCHER","Sam LaPorta","DET","TE",1.25],["JOSH","Roschon Johnson","CHI","RB",1.25],
+["PAUL","Tyjae Spears","TEN","RB",1.25],["RYAN","Chase Brown","CIN","RB",1.25],
+];
+const rfaPlayers = RFA_RAW.map((r,i)=>({id:"rfa"+i, owner:r[0], name:r[1], team:r[2], pos:r[3], rfaStart:r[4]}));
+
+const FA_RAW = [
+["JIMMY","Christian McCaffrey","RB",44.0],["FINCHER","Derrick Henry","RB",41.0],
+["JOSH","Saquon Barkley","RB",35.0],["IAN","Ja'Marr Chase","WR",34.5],
+["JIMMY","Kyren Williams","RB",31.0],["PAUL","Travis Etienne","RB",31.0],
+["JOSH","Patrick Mahomes","QB",28.0],["IAN","Jalen Hurts","QB",26.45],
+["JOSH","Justin Jefferson","WR",24.0],["FINCHER","Lamar Jackson","QB",22.5],
+["COLLIN","Justin Herbert","QB",19.0],["RYAN","Tyrone Tracy","RB",19.0],
+["BUB","Chuba Hubbard","RB",18.0],["RYAN","Joe Mixon","RB",17.0],
+["BUB","Javonte Williams","RB",16.0],["IAN","DeAndre Swift","RB",15.0],
+["PAUL","George Kittle","TE",15.0],["RYAN","DK Metcalf","WR",15.0],
+["BUB","Baker Mayfield","QB",13.0],["BUB","D.J. Moore","WR",11.0],
+["PAUL","Brandon Aiyuk","WR",10.0],["COLLIN","Rhamondre Stevenson","RB",9.0],
+["IAN","Davante Adams","WR",9.0],["IAN","Travis Kelce","TE",9.0],
+["JIMMY","George Pickens","WR",9.0],["COLLIN","Dallas Goedert","TE",8.0],
+["JIMMY","J.K. Dobbins","RB",8.0],["COLLIN","Michael Pittman","WR",7.0],
+["PAUL","Geno Smith","QB",7.0],["RYAN","Aaron Jones","RB",7.0],
+["JOSH","Jacory Croskey-Merritt","RB",7.0],["COLLIN","Stefon Diggs","WR",6.0],
+["PAUL","Luke Musgrave","TE",6.0],["RYAN","Nick Chubb","RB",6.0],
+["IAN","Rico Dowdle","RB",5.0],["IAN","Jordan Mason","RB",5.0],
+["JIMMY","Allen Lazard","WR",5.0],["JOSH","Cooper Kupp","WR",5.0],
+["IAN","Evan Engram","TE",4.0],["RYAN","Trevor Lawrence","QB",4.0],
+["JOSH","Pat Freiermuth","TE",4.0],["JOSH","Matthew Stafford","QB",4.0],
+["IAN","Sam Darnold","QB",3.0],["IAN","Woody Marks","RB",3.0],
+["IAN","Michael Carter","RB",3.0],["JIMMY","Samaje Perine","RB",3.0],
+["JOSH","Hollywood Brown","WR",3.0],["JOSH","Jerry Jeudy","WR",2.0],
+["BUB","Cade Otton","TE",1.0],["COLLIN","Ollie Gordon","RB",1.0],
+["IAN","Romeo Doubs","WR",1.0],["IAN","Joshua Karty","PK",1.0],
+["IAN","Zach Ertz","TE",1.0],["JIMMY","Brandon McManus","PK",1.0],
+["RYAN","Oronde Gadsden","TE",1.0],["PAUL","Elijah Mitchell","RB",1.0],
+["PAUL","Kai Fairbairn","PK",1.0],["PAUL","Calvin Austin","WR",1.0],
+["RYAN","Khalil Shakir","WR",1.0],["JOSH","Audric Estime","RB",1.0],
+["JOSH","Tyler Loop","PK",1.0],["JOSH","Miles Sanders","RB",1.0],
+];
+const faPlayersStatic = FA_RAW.map((r,i)=>({id:"fa"+i, lastOwner:r[0], name:r[1], pos:r[2], origCost:r[3]}));
+
+/* =========================================================
+   LOCAL MIRROR (populated by Firebase listeners)
+   ========================================================= */
+const mirror = {
+  teams: {},          // teamId -> {cap, startCap, signings, claimedBy}
+  rfa: { activePlayerId:null, players:{} },
+  fa: { activePlayerId:null, players:{}, customPlayers:{} },
+  ready:false
+};
+
+function fmt(n){ if(n===null||n===undefined||isNaN(n)) return "—"; const r=Math.round(n*100)/100; return (r%1===0? r.toFixed(0): r.toFixed(2)); }
+function money(n){ return "$"+fmt(n); }
+function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.style.display='block'; clearTimeout(t._h); t._h=setTimeout(()=>t.style.display='none',2800); }
+function allFaPlayers(){
+  const custom = Object.entries(mirror.fa.customPlayers||{}).map(([id,p])=>({id, lastOwner:null, name:p.name, pos:p.pos, origCost:0}));
+  return [...faPlayersStatic, ...custom];
+}
+
+/* =========================================================
+   AUTH + LOGIN GATE
+   ========================================================= */
+onAuthStateChanged(auth, user=>{
+  if(user){ myUid = user.uid; startListeners(); if(myTeam) enterApp(); else showLoginGate(); }
+  else { signInAnonymously(auth).catch(e=>toast("Sign-in failed: "+e.message)); }
+});
+
+function showLoginGate(){
+  document.getElementById('loginGate').style.display='flex';
+  document.getElementById('topbar').style.display='none';
+  document.getElementById('tickerWrap').style.display='none';
+  document.getElementById('app').style.display='none';
+  renderTeamPick();
+}
+function renderTeamPick(){
+  const el = document.getElementById('teamPick');
+  el.innerHTML = Object.keys(OWNERS).map(tid=>{
+    const t = mirror.teams[tid];
+    const claimed = t && t.claimedBy;
+    return `<button onclick="window.__login('${tid}')">
+      <span class="tn">${OWNERS[tid]}</span>
+      <span class="ts">${t? money(t.cap)+' available' : 'loading…'}${claimed? ' · in use': ''}</span>
+    </button>`;
+  }).join("");
+}
+window.__login = function(tid){
+  myTeam = tid;
+  localStorage.setItem('pgl_team', tid);
+  set(ref(db, `${ROOT}/teams/${tid}/claimedBy`), myUid);
+  enterApp();
+};
+window.switchTeam = function(){
+  localStorage.removeItem('pgl_team');
+  myTeam = null;
+  showLoginGate();
+};
+function enterApp(){
+  document.getElementById('loginGate').style.display='none';
+  document.getElementById('topbar').style.display='flex';
+  document.getElementById('tickerWrap').style.display='block';
+  document.getElementById('app').style.display='block';
+  document.getElementById('meLabel').textContent = OWNERS[myTeam] || myTeam;
+  set(ref(db, `${ROOT}/teams/${myTeam}/claimedBy`), myUid);
+  const dot = document.getElementById('connDot');
+  onValue(ref(db, ".info/connected"), snap=>{ dot.classList.toggle('off', !snap.val()); });
+  renderAll();
+}
+
+/* =========================================================
+   FIREBASE LISTENERS -> mirror -> re-render
+   ========================================================= */
+function startListeners(){
+  // ensure teams exist with starting values (only writes if missing)
+  Object.keys(OWNERS).forEach(tid=>{
+    get(ref(db, `${ROOT}/teams/${tid}`)).then(snap=>{
+      if(!snap.exists()){
+        set(ref(db, `${ROOT}/teams/${tid}`), {cap:START_CAP[tid], startCap:START_CAP[tid], signings:{}, claimedBy:null});
+      }
+    });
+  });
+  onValue(ref(db, `${ROOT}/teams`), snap=>{
+    mirror.teams = snap.val() || {};
+    mirror.ready = true;
+    if(!myTeam) renderTeamPick();
+    renderAll();
+  });
+  onValue(ref(db, `${ROOT}/rfa`), snap=>{
+    const v = snap.val() || {};
+    mirror.rfa.activePlayerId = v.activePlayerId || null;
+    mirror.rfa.players = v.players || {};
+    renderAll();
+  });
+  onValue(ref(db, `${ROOT}/fa`), snap=>{
+    const v = snap.val() || {};
+    mirror.fa.activePlayerId = v.activePlayerId || null;
+    mirror.fa.players = v.players || {};
+    mirror.fa.customPlayers = v.customPlayers || {};
+    renderAll();
+  });
+}
+
+/* =========================================================
+   SHELL
+   ========================================================= */
+let phase = "dashboard";
+function setPhase(p){ phase=p; renderAll(); window.scrollTo({top:0,behavior:'smooth'}); }
+window.setPhase = setPhase;
+
+function renderShell(){
+  const nav = document.getElementById('nav');
+  const tabs = [["dashboard","Dashboard"],["rfa","RFA Round"],["fa","FA Auction"],["summary","Summary"]];
+  nav.innerHTML = tabs.map(([id,label])=>`<button class="${phase===id?'active':''}" onclick="setPhase('${id}')">${label}</button>`).join("");
+
+  const ticker = document.getElementById('ticker');
+  ticker.innerHTML = Object.keys(OWNERS).map(tid=>{
+    const t = mirror.teams[tid] || {cap:START_CAP[tid], startCap:START_CAP[tid], signings:{}};
+    const spent = t.startCap - t.cap;
+    const low = t.cap < t.startCap*0.15;
+    const nSign = Object.keys(t.signings||{}).length;
+    return `<div class="ticker-tile">
+      <div class="tname">${OWNERS[tid]}${tid===myTeam?' (you)':''}</div>
+      <div class="tcap mono ${low?'low':''}">${money(t.cap)}</div>
+      <div class="tsub">${nSign} signed · spent ${money(spent)}</div>
+    </div>`;
+  }).join("");
+}
+function renderAll(){ if(!mirror.ready) return; renderShell(); renderApp(); }
+function renderApp(){
+  const app = document.getElementById('app');
+  if(phase==="dashboard") app.innerHTML = viewDashboard();
+  else if(phase==="rfa") app.innerHTML = viewRFA();
+  else if(phase==="fa") app.innerHTML = viewFA();
+  else if(phase==="summary") app.innerHTML = viewSummary();
+}
+
+/* =========================================================
+   DASHBOARD
+   ========================================================= */
+function viewDashboard(){
+  const rfaPending = rfaPlayers.filter(p=>!(mirror.rfa.players[p.id]||{}).done).length;
+  const faList = allFaPlayers();
+  const faPending = faList.filter(p=>!(mirror.fa.players[p.id]||{}).done).length;
+
+  const teamCards = Object.keys(OWNERS).map(tid=>{
+    const t = mirror.teams[tid] || {cap:START_CAP[tid], startCap:START_CAP[tid], signings:{}};
+    const pct = Math.max(0,Math.min(100,(t.cap/t.startCap)*100));
+    const nSign = Object.keys(t.signings||{}).length;
+    return `<div class="team-card ${tid===myTeam?'mine':''}">
+      <div class="row1"><span class="owner">${OWNERS[tid]}${tid===myTeam?' · you':''}</span><span class="cap mono">${money(t.cap)}</span></div>
+      <div class="barbg"><div class="barfg" style="width:${pct}%"></div></div>
+      <div class="meta"><span>Start ${money(t.startCap)}</span><span>${nSign} moves</span></div>
+    </div>`;
+  }).join("");
+
+  return `
+  <div class="section-head"><div><h2>Offseason Control Room</h2><div class="desc">Live-synced across all 8 owners. Bids stay private to each team until reveal.</div></div></div>
+  <div class="grid-2" style="margin-bottom:26px;">
+    <div class="plaque"><div class="bc2"></div><div class="bc3"></div>
+      <div class="eyebrow-label">Step 1 · Restricted Free Agency</div>
+      <h3 style="margin:4px 0 6px;font-size:22px;">Retain or release your RFAs first</h3>
+      <p style="color:var(--muted);font-size:13px;line-height:1.6;margin:0 0 16px;">${rfaPending} of ${rfaPlayers.length} restricted free agents still need resolving.</p>
+      <button class="btn turf" onclick="setPhase('rfa')">${rfaPending? 'Enter RFA Round' : 'Review RFA Results'}</button>
+    </div>
+    <div class="plaque"><div class="bc2"></div><div class="bc3"></div>
+      <div class="eyebrow-label">Step 2 · Open Free Agency</div>
+      <h3 style="margin:4px 0 6px;font-size:22px;">Auction the open market</h3>
+      <p style="color:var(--muted);font-size:13px;line-height:1.6;margin:0 0 16px;">${faPending} of ${faList.length} free agents remain unsigned.</p>
+      <button class="btn ghost" onclick="setPhase('fa')">${faPending? 'Enter FA Auction' : 'Review FA Results'}</button>
+    </div>
+  </div>
+  <div class="section-head"><h2 style="font-size:18px;">Team Cap Space</h2></div>
+  <div class="grid-3">${teamCards}</div>
+  `;
+}
+
+/* =========================================================
+   RFA ROUND
+   ========================================================= */
+function rfaRec(pid){ return mirror.rfa.players[pid] || {}; }
+function currentRfaPlayer(){
+  const remaining = rfaPlayers.filter(p=>!rfaRec(p.id).done);
+  if(remaining.length===0) return null;
+  let activeId = mirror.rfa.activePlayerId;
+  if(!activeId || rfaRec(activeId).done) activeId = remaining[0].id;
+  return rfaPlayers.find(p=>p.id===activeId);
+}
+function jumpRfa(id){
+  if(rfaRec(id).done) return;
+  set(ref(db, `${ROOT}/rfa/activePlayerId`), id);
+}
+window.jumpRfa = jumpRfa;
+
+function viewRFA(){
+  const p = currentRfaPlayer();
+  const queue = rfaPlayers.map(pl=>{
+    const rec = rfaRec(pl.id);
+    const done = rec.done;
+    return `<div class="queue-item ${done?'done':''} ${p&&p.id===pl.id?'active':''}" onclick="jumpRfa('${pl.id}')">
+      <div><div class="qname">${pl.name}</div><div class="qsub">${pl.pos} · ${OWNERS[pl.owner]}</div></div>
+      <div>${done? tagFor(rec.result) : `<span class="mono" style="color:var(--muted)">${money(pl.rfaStart)}</span>`}</div>
+    </div>`;
+  }).join("");
+
+  if(!p){
+    return `<div class="section-head"><div><h2>RFA Round</h2><div class="desc">All restricted free agents are resolved.</div></div>
+      <button class="btn" onclick="setPhase('summary')">View Summary</button></div>
+      <div class="card empty"><div class="display">RFA Round Complete</div>All 20 restricted free agents have been retained or released.</div>`;
+  }
+
+  const rec = rfaRec(p.id);
+  const roundNum = rec.round || 1;
+  const bidsForRound = (rec.bids && rec.bids[roundNum]) || {};
+  const revealedForRound = !!((rec.revealed||{})[roundNum]);
+  const eligibleTeams = Object.keys(OWNERS).filter(k=>k!==p.owner);
+
+  const tiles = eligibleTeams.map(tid=>{
+    const b = bidsForRound[tid];
+    const mine = tid===myTeam;
+    let inner;
+    if(mine && p.owner!==myTeam){
+      if(!b || b.status==='pending'){
+        const yearOpts = [1,2,3,4].map(y=>`<option value="${y}" ${y===2?'selected':''}>${y}yr</option>`).join("");
+        inner = `<div class="fields">
+            <input type="number" min="0" step="0.25" id="bidin_${tid}" placeholder="$">
+            <select id="bidyr_${tid}">${yearOpts}</select>
+          </div>
+          <div class="btnrow">
+            <button class="btn small turf" style="flex:1;" onclick="lockBid('${p.id}',${roundNum},'${tid}')">Lock</button>
+            <button class="btn small ghost" onclick="passBid('${p.id}',${roundNum},'${tid}')">Pass</button>
+          </div>`;
+      } else if(b.status==='passed'){
+        inner = `<div class="amt">PASS</div>`;
+      } else {
+        inner = `<div class="amt">${money(b.amount)} <span style="font-size:12px;color:var(--muted);">/ ${b.years}yr (you)</span></div>`;
+      }
+    } else {
+      if(!b || b.status==='pending') inner = `<div class="amt" style="color:var(--muted);">Waiting…</div>`;
+      else if(b.status==='passed') inner = `<div class="amt">PASS</div>`;
+      else inner = `<div class="amt">${revealedForRound? `${money(b.amount)} <span style="font-size:12px;color:var(--muted);">/ ${b.years}yr</span>` : 'LOCKED'}</div>`;
+    }
+    return `<div class="bid-tile ${b&&b.status==='locked'?'locked':''} ${b&&b.status==='passed'?'passed':''} ${mine?'mine':''}">
+      <div class="who">${OWNERS[tid]}${mine?' (you)':''}</div>
+      ${inner}
+    </div>`;
+  }).join("");
+
+  const allResponded = eligibleTeams.every(tid=>bidsForRound[tid] && bidsForRound[tid].status!=='pending');
+  let roundControls = "";
+  if(!revealedForRound){
+    roundControls = `<button class="btn turf" ${allResponded?'':'disabled'} onclick="revealRound('${p.id}',${roundNum})">Reveal Round ${roundNum} Bids</button>
+      <div class="discount-note">${allResponded? 'Everyone has responded — ready to reveal.' : 'Waiting on all 7 teams to lock or pass before reveal.'}</div>`;
+  } else if(roundNum===1){
+    roundControls = `<button class="btn" onclick="advanceRound('${p.id}')">Start Round 2 Blind Bids</button>`;
+  }
+
+  let decisionPanel = "";
+  const round2Revealed = !!((rec.revealed||{})[2]);
+  if(round2Revealed && !rec.done){
+    const allBids = [];
+    [1,2].forEach(rnd=>{
+      const rb = (rec.bids && rec.bids[rnd]) || {};
+      Object.entries(rb).forEach(([tid,b])=>{ if(b && b.status==='locked') allBids.push({tid, amount:b.amount, years:b.years}); });
+    });
+    let finalPrice=0, finalTeam=null, finalYears=2;
+    allBids.forEach(b=>{ if(b.amount>finalPrice){finalPrice=b.amount;finalTeam=b.tid;finalYears=b.years;} });
+    const discountEligible = finalPrice>=10;
+    const matchPrice = discountEligible? Math.round(finalPrice*0.85*100)/100 : finalPrice;
+    const isOwner = myTeam===p.owner;
+
+    if(!finalTeam){
+      decisionPanel = `<div class="hairline"></div><div class="eyebrow-label">No Bids Received</div>
+        <p style="color:var(--muted);font-size:13px;">No other team bid on ${p.name}. ${OWNERS[p.owner]} retains at the RFA start price.</p>
+        ${isOwner? `<button class="btn turf" onclick="finalizeRfa('${p.id}', {decision:'unopposed', team:'${p.owner}', amount:${p.rfaStart}, years:2})">Retain at ${money(p.rfaStart)} / 2yr</button>`
+                  : `<p class="waiting-note">Waiting for ${OWNERS[p.owner]} to confirm.</p>`}`;
+    } else {
+      decisionPanel = `<div class="hairline"></div><div class="eyebrow-label">Final Offer</div>
+        <div class="led led-lg">${money(finalPrice)} <span style="font-size:22px;color:var(--muted);">/ ${finalYears}yr</span></div>
+        <div class="discount-note">High bid: ${OWNERS[finalTeam]} &nbsp;·&nbsp; Match price for ${OWNERS[p.owner]}: ${money(matchPrice)} / ${finalYears}yr ${discountEligible? '(15% discount)':'(no discount — under $10)'}</div>
+        ${isOwner? `<div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap;">
+          <button class="btn turf" onclick="finalizeRfa('${p.id}', {decision:'matched', team:'${p.owner}', amount:${matchPrice}, years:${finalYears}})">Match — Retain at ${money(matchPrice)} / ${finalYears}yr</button>
+          <button class="btn alert" onclick="finalizeRfa('${p.id}', {decision:'lost', team:'${finalTeam}', amount:${finalPrice}, years:${finalYears}})">Decline — ${OWNERS[finalTeam]} Signs at ${money(finalPrice)} / ${finalYears}yr</button>
+        </div>` : `<p class="waiting-note">Waiting for ${OWNERS[p.owner]} to match or decline.</p>`}`;
+    }
+  }
+
+  return `
+  <div class="section-head"><div><h2>RFA Round</h2><div class="desc">${rfaPlayers.filter(x=>!rfaRec(x.id).done).length} of ${rfaPlayers.length} remaining · your bids are hidden from other teams until reveal.</div></div></div>
+  <div class="grid-2">
+    <div class="plaque"><div class="bc2"></div><div class="bc3"></div>
+      <div class="player-head">
+        <div><div class="eyebrow-label">Restricted Free Agent</div><h3 class="player-name">${p.name}</h3>
+          <div class="player-sub">${p.pos} · ${p.team} &nbsp;|&nbsp; Original owner: ${OWNERS[p.owner]} &nbsp;|&nbsp; RFA start ${money(p.rfaStart)}</div></div>
+        <span class="badge-round">ROUND ${roundNum} OF 2</span>
+      </div>
+      ${myTeam===p.owner? `<div class="discount-note" style="margin-bottom:10px;">You're the original owner — sit tight while others bid, you'll get the match/decline call after round 2.</div>` : ''}
+      <div class="bid-tiles">${tiles}</div>
+      <div style="margin-top:18px;">${roundControls}</div>
+      ${decisionPanel}
+    </div>
+    <div class="card"><div class="eyebrow-label">RFA Queue</div><div class="scroll-list">${queue}</div></div>
+  </div>
+  `;
+}
+function tagFor(rec){
+  if(!rec) return "";
+  if(rec.decision==='lost') return `<span class="tag rfa-lost">Lost · ${money(rec.amount)}/${rec.years}yr</span>`;
+  return `<span class="tag rfa-keep">Retained · ${money(rec.amount)}/${rec.years}yr</span>`;
+}
+
+async function lockBid(pid, round, tid){
+  const val = parseFloat(document.getElementById(`bidin_${tid}`).value);
+  const years = parseInt(document.getElementById(`bidyr_${tid}`).value);
+  if(isNaN(val) || val<0){ toast("Enter a valid bid amount"); return; }
+  await update(ref(db, `${ROOT}/rfa/players/${pid}/bids/${round}/${tid}`), {status:'locked', amount:val, years});
+}
+async function passBid(pid, round, tid){
+  await update(ref(db, `${ROOT}/rfa/players/${pid}/bids/${round}/${tid}`), {status:'passed'});
+}
+async function revealRound(pid, round){
+  await set(ref(db, `${ROOT}/rfa/players/${pid}/revealed/${round}`), true);
+}
+async function advanceRound(pid){
+  await set(ref(db, `${ROOT}/rfa/players/${pid}/round`), 2);
+}
+async function finalizeRfa(pid, result){
+  const p = rfaPlayers.find(x=>x.id===pid);
+  const teamSnap = await get(ref(db, `${ROOT}/teams/${result.team}`));
+  const team = teamSnap.val();
+  if(result.amount > team.cap){
+    if(!confirm(`${OWNERS[result.team]} only has ${money(team.cap)} available and this costs ${money(result.amount)}. Record anyway?`)) return;
+  }
+  await runTransaction(ref(db, `${ROOT}/teams/${result.team}/cap`), cur => (cur==null? team.cap : cur) - result.amount);
+  await update(ref(db, `${ROOT}/teams/${result.team}/signings/${pid}`), {name:p.name, pos:p.pos, amount:result.amount, years:result.years, type:'RFA'});
+  await update(ref(db, `${ROOT}/rfa/players/${pid}`), {done:true, result});
+  toast(`${p.name} → ${OWNERS[result.team]} · ${money(result.amount)} / ${result.years} yrs`);
+}
+window.lockBid=lockBid; window.passBid=passBid; window.revealRound=revealRound; window.advanceRound=advanceRound; window.finalizeRfa=finalizeRfa;
+
+/* =========================================================
+   FA AUCTION
+   ========================================================= */
+function faRec(pid){ return mirror.fa.players[pid] || {}; }
+function viewFA(){
+  const faList = allFaPlayers();
+  const remaining = faList.filter(p=>!faRec(p.id).done);
+  const search = window.__faSearch || "";
+  const filtered = remaining.filter(p=>p.name.toLowerCase().includes(search.toLowerCase()));
+
+  const list = filtered.map(p=>`
+    <div class="queue-item ${mirror.fa.activePlayerId===p.id?'active':''}" onclick="nominateFA('${p.id}')">
+      <div><div class="qname">${p.name}</div><div class="qsub">${p.pos}${p.lastOwner? ' · last with '+OWNERS[p.lastOwner] : ''}</div></div>
+      <div class="mono" style="color:var(--muted)">${p.origCost? money(p.origCost):''}</div>
+    </div>`).join("") || `<div style="color:var(--muted);font-size:13px;padding:14px;">No matches.</div>`;
+
+  let stage;
+  const activeId = mirror.fa.activePlayerId;
+  const activeDone = activeId && faRec(activeId).done;
+  if(!activeId || activeDone){
+    stage = `<div class="plaque empty"><div class="bc2"></div><div class="bc3"></div><div class="display">Nominate a Player</div>Pick anyone from the market list to open the offer sheet.</div>`;
+  } else {
+    const p = faList.find(x=>x.id===activeId);
+    const rec = faRec(activeId);
+    const isRookie = !!rec.isRookie;
+    const revealed = !!rec.revealed;
+    const offers = rec.offers || {};
+    const yrChoices = isRookie? [1,2] : [1,2,3,4];
+
+    const tiles = Object.keys(OWNERS).map(tid=>{
+      const o = offers[tid];
+      const mine = tid===myTeam;
+      const team = mirror.teams[tid] || {cap:START_CAP[tid]};
+      let inner;
+      if(mine){
+        if(!o || o.status==='pending'){
+          const yearOpts = yrChoices.map(y=>`<option value="${y}">${y}yr</option>`).join("");
+          inner = `<div class="fields"><input type="number" min="0" step="0.25" id="off_amt" placeholder="$"><select id="off_yrs">${yearOpts}</select></div>
+            <div class="btnrow">
+              <button class="btn small turf" style="flex:1;" onclick="lockOffer('${activeId}','${tid}')">Lock</button>
+              <button class="btn small ghost" onclick="passOffer('${activeId}','${tid}')">Pass</button>
+            </div>`;
+        } else if(o.status==='passed'){
+          inner = `<div class="offer-readout" style="color:var(--muted);">PASS</div>`;
+        } else {
+          inner = `<div class="offer-readout">${money(o.amount)} <span style="font-size:12px;color:var(--muted);">/ ${o.years}yr (you)</span></div>`;
+        }
+      } else {
+        if(!o || o.status==='pending') inner = `<div class="offer-readout" style="color:var(--muted);font-size:14px;">Waiting…</div>`;
+        else if(o.status==='passed') inner = `<div class="offer-readout" style="color:var(--muted);">PASS</div>`;
+        else if(!revealed) inner = `<div class="offer-readout">LOCKED</div>`;
+        else inner = `<div class="offer-readout">${money(o.amount)} <span style="font-size:12px;color:var(--muted);">/ ${o.years}yr</span></div>
+          <button class="btn small turf block" onclick="signOffer('${activeId}','${tid}')">Sign This Offer</button>`;
+      }
+      if(revealed && mine && o && o.status==='locked'){
+        inner += `<button class="btn small turf block" onclick="signOffer('${activeId}','${tid}')">Sign This Offer</button>`;
+      }
+      return `<div class="offer-tile ${o&&o.status==='locked'?'locked':''} ${o&&o.status==='passed'?'passed':''} ${mine?'mine':''}">
+        <div class="who">${OWNERS[tid]}${mine?' (you)':''}<br><span style="color:var(--muted);font-weight:400;">${money(team.cap)} avail.</span></div>
+        ${inner}
+      </div>`;
+    }).join("");
+
+    const anyLocked = Object.values(offers).some(o=>o && o.status==='locked');
+
+    stage = `<div class="plaque"><div class="bc2"></div><div class="bc3"></div>
+      <div class="player-head"><div><div class="eyebrow-label">On The Market</div><h3 class="player-name">${p.name}</h3>
+        <div class="player-sub">${p.pos}${p.lastOwner? ' &nbsp;|&nbsp; Last with '+OWNERS[p.lastOwner]:''}${p.origCost? ' &nbsp;|&nbsp; Prior cost '+money(p.origCost):''}</div></div></div>
+      <label style="display:flex;align-items:center;gap:8px;margin-bottom:8px;cursor:pointer;">
+        <input type="checkbox" ${isRookie?'checked':''} onchange="toggleRookie('${activeId}', this.checked)" style="width:16px;height:16px;accent-color:var(--gold);">
+        <span style="font-size:12.5px;color:var(--muted);">Rookie signing (capped at 2 yrs + automatic 3rd-yr RFA option)</span>
+      </label>
+      <div class="discount-note" style="margin-bottom:10px;">Every team enters its own $ + years offer, hidden from each other until reveal.</div>
+      <div class="offer-tiles">${tiles}</div>
+      <div style="display:flex;gap:10px;margin-top:18px;flex-wrap:wrap;">
+        ${!revealed? `<button class="btn turf" ${anyLocked?'':'disabled'} onclick="revealOffers('${activeId}')">Reveal Offers</button>`:''}
+        <button class="btn ghost" onclick="skipFA('${activeId}')">${revealed? 'Close — No Signing':'Cancel / Skip'}</button>
+      </div>
+    </div>`;
+  }
+
+  return `
+  <div class="section-head"><div><h2>Free Agent Auction</h2><div class="desc">${remaining.length} of ${faList.length} players remain. Each team submits its own $ + years offer.</div></div></div>
+  <div class="grid-2">
+    ${stage}
+    <div class="card">
+      <div class="eyebrow-label">Market Board</div>
+      <div class="search-box"><input type="text" placeholder="Search players…" value="${search}" oninput="window.__faSearch=this.value; renderApp();"></div>
+      <div class="scroll-list">${list}</div>
+      <div class="hairline"></div>
+      <div class="eyebrow-label">Add a Player Not Listed</div>
+      <div style="display:flex;gap:8px;">
+        <input type="text" id="custom_name" placeholder="Player name">
+        <select id="custom_pos" style="max-width:90px;"><option>QB</option><option>RB</option><option>WR</option><option>TE</option><option>PK</option></select>
+        <button class="btn ghost small" onclick="addCustomFA()">Add</button>
+      </div>
+    </div>
+  </div>
+  `;
+}
+async function nominateFA(pid){ await set(ref(db, `${ROOT}/fa/activePlayerId`), pid); }
+async function toggleRookie(pid, checked){ await set(ref(db, `${ROOT}/fa/players/${pid}/isRookie`), checked); }
+async function lockOffer(pid, tid){
+  const amt = parseFloat(document.getElementById('off_amt').value);
+  const years = parseInt(document.getElementById('off_yrs').value);
+  if(isNaN(amt) || amt<0){ toast("Enter a valid offer amount"); return; }
+  if(!years){ toast("Select a contract length"); return; }
+  if(amt>=20 && years<2){ toast("Offers of $20+ require at least a 2-year contract"); return; }
+  const teamSnap = await get(ref(db, `${ROOT}/teams/${tid}`));
+  const team = teamSnap.val();
+  if(amt > team.cap){ toast(`You only have ${money(team.cap)} available`); return; }
+  await update(ref(db, `${ROOT}/fa/players/${pid}/offers/${tid}`), {status:'locked', amount:amt, years});
+}
+async function passOffer(pid, tid){ await update(ref(db, `${ROOT}/fa/players/${pid}/offers/${tid}`), {status:'passed'}); }
+async function revealOffers(pid){ await set(ref(db, `${ROOT}/fa/players/${pid}/revealed`), true); }
+async function signOffer(pid, tid){
+  const faList = allFaPlayers();
+  const p = faList.find(x=>x.id===pid);
+  const rec = faRec(pid);
+  const o = rec.offers[tid];
+  const teamSnap = await get(ref(db, `${ROOT}/teams/${tid}`));
+  const team = teamSnap.val();
+  if(o.amount > team.cap){ toast(`${OWNERS[tid]} no longer has enough cap`); return; }
+  const rfaOption = rec.isRookie && o.years===2;
+  await runTransaction(ref(db, `${ROOT}/teams/${tid}/cap`), cur => (cur==null? team.cap : cur) - o.amount);
+  await update(ref(db, `${ROOT}/teams/${tid}/signings/${pid}`), {name:p.name, pos:p.pos, amount:o.amount, years:o.years, type:'FA', rfaOption});
+  await update(ref(db, `${ROOT}/fa/players/${pid}`), {done:true, result:{team:tid, amount:o.amount, years:o.years}});
+  toast(`${p.name} signed by ${OWNERS[tid]} · ${money(o.amount)} / ${o.years} yr${rfaOption?' (+RFA opt)':''}`);
+}
+async function skipFA(pid){ await set(ref(db, `${ROOT}/fa/activePlayerId`), null); }
+async function addCustomFA(){
+  const name = document.getElementById('custom_name').value.trim();
+  const pos = document.getElementById('custom_pos').value;
+  if(!name){ toast("Enter a player name"); return; }
+  const id = "custom_"+Date.now();
+  await set(ref(db, `${ROOT}/fa/customPlayers/${id}`), {name, pos});
+  document.getElementById('custom_name').value='';
+  toast(`${name} added to the market board`);
+}
+window.nominateFA=nominateFA; window.toggleRookie=toggleRookie; window.lockOffer=lockOffer;
+window.passOffer=passOffer; window.revealOffers=revealOffers; window.signOffer=signOffer;
+window.skipFA=skipFA; window.addCustomFA=addCustomFA;
+
+/* =========================================================
+   SUMMARY
+   ========================================================= */
+function viewSummary(){
+  const rows = [];
+  Object.keys(OWNERS).forEach(tid=>{
+    const t = mirror.teams[tid] || {};
+    Object.values(t.signings||{}).forEach(s=>rows.push({team:OWNERS[tid], ...s}));
+  });
+  const body = rows.map(r=>`<tr><td>${r.team}</td><td>${r.name}</td><td>${r.pos}</td>
+    <td><span class="tag ${r.type==='RFA'?'rfa-keep':'fa'}">${r.type}</span></td>
+    <td class="mono">${money(r.amount)}</td>
+    <td class="mono">${r.years} yr${r.rfaOption? ' <span style="color:var(--gold-bright);">+RFA opt</span>':''}</td>
+  </tr>`).join("") || `<tr><td colspan="6" style="color:var(--muted);text-align:center;padding:30px;">No signings recorded yet.</td></tr>`;
+
+  return `
+  <div class="section-head"><div><h2>Session Summary</h2><div class="desc">Live across all 8 owners — everyone sees the same board.</div></div>
+    <div style="display:flex;gap:10px;"><button class="btn" onclick="exportCSV()">Export CSV</button></div>
+  </div>
+  <div class="card"><table><thead><tr><th>Team</th><th>Player</th><th>Pos</th><th>Type</th><th>Salary</th><th>Years</th></tr></thead><tbody>${body}</tbody></table></div>
+  `;
+}
+function exportCSV(){
+  let csv = "Team,Player,Position,Type,Salary,Years\n";
+  Object.keys(OWNERS).forEach(tid=>{
+    const t = mirror.teams[tid] || {};
+    Object.values(t.signings||{}).forEach(s=>{ csv += `"${OWNERS[tid]}","${s.name}",${s.pos},${s.type},${s.amount},${s.years}\n`; });
+  });
+  const blob = new Blob([csv],{type:'text/csv'});
+  const a = document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='pgl_offseason_signings.csv'; a.click();
+}
+window.exportCSV = exportCSV;
+</script>
+</body>
+</html>
