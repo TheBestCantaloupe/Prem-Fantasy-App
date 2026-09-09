@@ -697,7 +697,7 @@ window.setPhase = setPhase;
 
 function renderShell(){
   const nav = document.getElementById('nav');
-  const tabs = [["dashboard","Dashboard"],["rosters","Rosters"],["sleeper","Sleeper Sync"],["rfa","RFA Round"],["fa","FA Auction"],["summary","Summary"]];
+  const tabs = [["dashboard","Dashboard"],["rosters","Rosters"],["standings","Standings"],["sleeper","Sleeper Sync"],["rfa","RFA Round"],["fa","FA Auction"],["summary","Summary"]];
   nav.innerHTML = tabs.map(([id,label])=>`<button class="${phase===id?'active':''}" onclick="setPhase('${id}')">${label}</button>`).join("");
 
   const ticker = document.getElementById('ticker');
@@ -718,6 +718,7 @@ function renderApp(){
   const app = document.getElementById('app');
   if(phase==="dashboard") app.innerHTML = viewDashboard();
   else if(phase==="rosters") app.innerHTML = viewRosters();
+  else if(phase==="standings") app.innerHTML = viewStandings();
   else if(phase==="sleeper") app.innerHTML = viewSleeper();
   else if(phase==="rfa") app.innerHTML = viewRFA();
   else if(phase==="fa") app.innerHTML = viewFA();
@@ -1100,6 +1101,171 @@ async function resyncLeagueData(){
   }
 }
 window.resyncLeagueData = resyncLeagueData;
+
+/* =========================================================
+   STANDINGS, SCOREBOARDS & SCHEDULES — pure live Sleeper
+   data, read-only. Unlike rosters/contracts, standings and
+   scores are things Sleeper already tracks natively, so this
+   never needs manual entry or reconciliation — just display.
+   ========================================================= */
+let standingsUI = { subview:'standings', league:null, matchupsByWeek:{}, loadingWeeks:new Set(), scheduleTeam:null, scoreboardWeek:1 };
+
+async function ensureLeagueInfo(){
+  if(standingsUI.league) return standingsUI.league;
+  standingsUI.league = await fetchJSON(`https://api.sleeper.app/v1/league/${SLEEPER_LEAGUE_ID}`);
+  return standingsUI.league;
+}
+function lastWeekToShow(){
+  const playoffStart = (standingsUI.league && standingsUI.league.settings && standingsUI.league.settings.playoff_week_start) || 15;
+  return Math.min(18, playoffStart + 2); // regular season + a buffer for the 2-week championship
+}
+function ensureWeekMatchups(week){
+  if(standingsUI.matchupsByWeek[week]) return standingsUI.matchupsByWeek[week];
+  if(standingsUI.loadingWeeks.has(week)) return null;
+  standingsUI.loadingWeeks.add(week);
+  fetchJSON(`https://api.sleeper.app/v1/league/${SLEEPER_LEAGUE_ID}/matchups/${week}`)
+    .then(data=>{ standingsUI.matchupsByWeek[week] = data; standingsUI.loadingWeeks.delete(week); renderApp(); })
+    .catch(()=>{ standingsUI.matchupsByWeek[week] = []; standingsUI.loadingWeeks.delete(week); renderApp(); });
+  return null;
+}
+function rosterIdToTeam(rosterId){
+  const tid = mirror.sleeperMapping && mirror.sleeperMapping[rosterId];
+  return tid ? OWNERS[tid] : `Roster ${rosterId}`;
+}
+
+function viewStandings(){
+  const mapped = mirror.sleeperMapping && Object.keys(mirror.sleeperMapping).length>0;
+  if(!mapped){
+    return `<div class="section-head"><div><h2>Standings</h2></div></div>
+      <div class="card empty"><div class="display">Set Up Sleeper First</div>Standings, scores, and schedules all pull live from Sleeper — head to the Sleeper Sync tab and complete the one-time team mapping first.
+      <div style="margin-top:14px;"><button class="btn turf" onclick="setPhase('sleeper')">Go to Sleeper Sync</button></div></div>`;
+  }
+  if(!sleeperUI.rosters && !sleeperUI.loading){ loadSleeperLeagueData(); }
+  if(!sleeperUI.rosters){
+    return `<div class="section-head"><div><h2>Standings</h2></div></div><div class="card empty"><div class="display">Loading…</div></div>`;
+  }
+  if(!standingsUI.league){ ensureLeagueInfo().then(renderApp); }
+
+  const subNav = `<div style="margin-bottom:18px;">
+    <button class="btn small ${standingsUI.subview==='standings'?'':'ghost'}" style="margin-right:8px;" onclick="setStandingsSubview('standings')">Standings</button>
+    <button class="btn small ${standingsUI.subview==='scoreboard'?'':'ghost'}" style="margin-right:8px;" onclick="setStandingsSubview('scoreboard')">Weekly Scoreboard</button>
+    <button class="btn small ${standingsUI.subview==='schedule'?'':'ghost'}" onclick="setStandingsSubview('schedule')">Team Schedule</button>
+  </div>`;
+
+  let body;
+  if(standingsUI.subview==='scoreboard') body = viewScoreboard();
+  else if(standingsUI.subview==='schedule') body = viewTeamSchedule();
+  else body = viewStandingsTable();
+
+  return `
+  <div class="section-head"><div><h2>Standings</h2><div class="desc">Live from Sleeper — records, scores, and schedule, read straight from your real league.</div></div></div>
+  ${subNav}
+  ${body}
+  `;
+}
+function setStandingsSubview(v){ standingsUI.subview = v; renderApp(); }
+window.setStandingsSubview = setStandingsSubview;
+
+function viewStandingsTable(){
+  const rows = [...sleeperUI.rosters]
+    .sort((a,b)=>{
+      const aw=(a.settings&&a.settings.wins)||0, bw=(b.settings&&b.settings.wins)||0;
+      if(bw!==aw) return bw-aw;
+      const apf=((a.settings&&a.settings.fpts)||0)+((a.settings&&a.settings.fpts_decimal)||0)/100;
+      const bpf=((b.settings&&b.settings.fpts)||0)+((b.settings&&b.settings.fpts_decimal)||0)/100;
+      return bpf-apf;
+    })
+    .map((r,i)=>{
+      const s = r.settings||{};
+      const pf = (s.fpts||0) + (s.fpts_decimal||0)/100;
+      const pa = (s.fpts_against||0) + (s.fpts_against_decimal||0)/100;
+      return `<tr>
+        <td class="mono">${i+1}</td>
+        <td>${rosterIdToTeam(r.roster_id)}</td>
+        <td class="mono">${s.wins||0}-${s.losses||0}${s.ties?`-${s.ties}`:''}</td>
+        <td class="mono">${pf.toFixed(2)}</td>
+        <td class="mono">${pa.toFixed(2)}</td>
+      </tr>`;
+    }).join("");
+  return `<div class="card">
+    <table><thead><tr><th>#</th><th>Team</th><th>Record</th><th>Points For</th><th>Points Against</th></tr></thead><tbody>${rows}</tbody></table>
+    <div class="discount-note" style="margin-top:10px;">Sorted by wins, then points for. Your constitution's full tie-break order (points → head-to-head → best week) isn't fully replicated here — treat close ties as needing a manual check.</div>
+  </div>`;
+}
+
+function viewScoreboard(){
+  const week = standingsUI.scoreboardWeek;
+  const last = lastWeekToShow();
+  const weekOpts = Array.from({length:last}, (_,i)=>i+1).map(w=>`<option value="${w}" ${w===week?'selected':''}>Week ${w}</option>`).join("");
+  const data = ensureWeekMatchups(week);
+
+  let content;
+  if(!data){
+    content = `<div class="card empty"><div class="display">Loading Week ${week}…</div></div>`;
+  } else if(!data.length){
+    content = `<div class="card empty"><div class="display">No Data</div>Sleeper hasn't generated matchups for week ${week} yet.</div>`;
+  } else {
+    const byMatchup = {};
+    data.forEach(m=>{ (byMatchup[m.matchup_id] = byMatchup[m.matchup_id]||[]).push(m); });
+    const cards = Object.values(byMatchup).map(pair=>{
+      if(pair.length<2) return '';
+      const [a,b] = pair;
+      const aWin = (a.points||0) > (b.points||0);
+      const bWin = (b.points||0) > (a.points||0);
+      return `<div class="card" style="margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;">
+        <div style="flex:1;"><div style="font-weight:600;color:${aWin?'var(--gold-bright)':'var(--paper)'};">${rosterIdToTeam(a.roster_id)}</div></div>
+        <div class="mono" style="font-size:20px;color:${aWin?'var(--gold-bright)':'var(--muted)'};width:70px;text-align:right;">${(a.points||0).toFixed(2)}</div>
+        <div style="width:30px;text-align:center;color:var(--muted);">–</div>
+        <div class="mono" style="font-size:20px;color:${bWin?'var(--gold-bright)':'var(--muted)'};width:70px;">${(b.points||0).toFixed(2)}</div>
+        <div style="flex:1;text-align:right;"><div style="font-weight:600;color:${bWin?'var(--gold-bright)':'var(--paper)'};">${rosterIdToTeam(b.roster_id)}</div></div>
+      </div>`;
+    }).join("");
+    content = cards || `<div class="card empty"><div class="display">No Matchups</div></div>`;
+  }
+
+  return `
+  <div style="margin-bottom:14px;"><select onchange="setScoreboardWeek(this.value)" style="max-width:160px;">${weekOpts}</select></div>
+  ${content}
+  `;
+}
+function setScoreboardWeek(w){ standingsUI.scoreboardWeek = parseInt(w); renderApp(); }
+window.setScoreboardWeek = setScoreboardWeek;
+
+function viewTeamSchedule(){
+  if(!standingsUI.scheduleTeam) standingsUI.scheduleTeam = myTeam;
+  const tid = standingsUI.scheduleTeam;
+  const teamTabs = Object.keys(OWNERS).map(k=>
+    `<button class="btn small ${k===tid?'':'ghost'}" style="margin:0 6px 6px 0;" onclick="setScheduleTeam('${k}')">${OWNERS[k]}</button>`
+  ).join("");
+
+  const myRoster = sleeperUI.rosters.find(r=> mirror.sleeperMapping[r.roster_id]===tid);
+  if(!myRoster) return `${teamTabs}<div class="card empty"><div class="display">Not Mapped</div></div>`;
+  const myRosterId = myRoster.roster_id;
+  const last = lastWeekToShow();
+
+  const rows = Array.from({length:last}, (_,i)=>i+1).map(week=>{
+    const data = ensureWeekMatchups(week);
+    if(!data) return `<tr><td class="mono">${week}</td><td colspan="3" style="color:var(--muted);">loading…</td></tr>`;
+    if(!data.length) return `<tr><td class="mono">${week}</td><td colspan="3" style="color:var(--muted);">—</td></tr>`;
+    const mine = data.find(m=>m.roster_id===myRosterId);
+    if(!mine) return `<tr><td class="mono">${week}</td><td colspan="3" style="color:var(--muted);">bye / not scheduled</td></tr>`;
+    const opp = data.find(m=>m.matchup_id===mine.matchup_id && m.roster_id!==myRosterId);
+    const played = (mine.points||0) > 0 || (opp && (opp.points||0) > 0);
+    const oppName = opp ? rosterIdToTeam(opp.roster_id) : 'TBD';
+    const scoreStr = played ? `${(mine.points||0).toFixed(2)} – ${(opp?opp.points||0:0).toFixed(2)}` : '—';
+    const result = played ? ((mine.points||0)>(opp?opp.points||0:0) ? '<span style="color:var(--turf-bright);">W</span>' : (mine.points||0)<(opp?opp.points||0:0) ? '<span style="color:var(--alert-bright);">L</span>' : 'T') : '';
+    return `<tr><td class="mono">${week}</td><td>vs ${oppName}</td><td class="mono">${scoreStr}</td><td>${result}</td></tr>`;
+  }).join("");
+
+  return `
+  <div style="margin-bottom:14px;">${teamTabs}</div>
+  <div class="card">
+    <table><thead><tr><th>Week</th><th>Opponent</th><th>Score</th><th></th></tr></thead><tbody>${rows}</tbody></table>
+  </div>
+  `;
+}
+function setScheduleTeam(tid){ standingsUI.scheduleTeam = tid; renderApp(); }
+window.setScheduleTeam = setScheduleTeam;
 
 /* =========================================================
    SLEEPER SYNC — read-only live check against your real
