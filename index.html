@@ -944,15 +944,25 @@ async function resyncLeagueData(){
       extensionsUsed: p.acq==='EXTENSION'?1:0
     };
   });
-  await set(ref(db, `${ROOT}/rosters`), seed);
-  await Promise.all(Object.keys(OWNERS).map(tid=>
+  try{
+    await set(ref(db, `${ROOT}/rosters`), seed);
+  }catch(e){
+    toast("Roster import failed: "+e.message);
+    return;
+  }
+  const results = await Promise.allSettled(Object.keys(OWNERS).map(tid=>
     update(ref(db, `${ROOT}/teams/${tid}`), {
       cap: START_CAP[tid], startCap: START_CAP[tid],
       futureCapHits: {plus1:0, plus2:0, plus3plus:0},
       usedExtensionThisSeason:false, usedFranchiseTagThisSeason:false
-    })
+    }).then(()=>({tid, ok:true})).catch(e=>({tid, ok:false, err:e.message}))
   ));
-  toast("League data resynced from the latest spreadsheet");
+  const failed = results.map(r=>r.value).filter(v=>v && !v.ok);
+  if(failed.length){
+    toast(`Rosters updated, but cap failed for: ${failed.map(f=>OWNERS[f.tid]).join(', ')} — try Resync again`);
+  } else {
+    toast("League data resynced from the latest spreadsheet");
+  }
 }
 window.resyncLeagueData = resyncLeagueData;
 
