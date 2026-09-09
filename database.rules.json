@@ -5,11 +5,12 @@
         "teams": {
           ".read": "auth != null",
           "$team": {
-            "cap": { ".write": "auth != null" },
-            "startCap": { ".write": "auth != null" },
-            "signings": { ".write": "auth != null" },
-            "claimedBy": { ".write": "auth != null" }
+            ".write": "auth != null"
           }
+        },
+        "rosters": {
+          ".read": "auth != null",
+          ".write": "auth != null"
         },
         "rfa": {
           "activePlayerId": { ".read": "auth != null", ".write": "auth != null" },
