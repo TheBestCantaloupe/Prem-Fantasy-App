@@ -313,11 +313,14 @@ const faPlayersStatic = FA_RAW.map((r,i)=>({id:"fa"+i, lastOwner:r[0], name:r[1]
    LOCAL MIRROR (populated by Firebase listeners)
    ========================================================= */
 const mirror = {
-  teams: {},          // teamId -> {cap, startCap, signings, claimedBy}
-  rfa: { activePlayerId:null, players:{} },
-  fa: { activePlayerId:null, players:{}, customPlayers:{} },
+  teams: {},           // teamId -> {cap, startCap, signings, claimedBy}
+  rfa: { activePlayerId:null, meta:{}, status:{} },   // all PUBLIC (no $ amounts)
+  fa: { activePlayerId:null, meta:{}, status:{}, customPlayers:{} },  // all PUBLIC
   ready:false
 };
+// Private $ amounts, fetched/cached on demand since Firebase rules won't
+// let a broad listener see them — see ensurePrivate() below.
+const privateCache = {}; // path -> {amount, years} | 'loading' | 'missing'
 
 function fmt(n){ if(n===null||n===undefined||isNaN(n)) return "—"; const r=Math.round(n*100)/100; return (r%1===0? r.toFixed(0): r.toFixed(2)); }
 function money(n){ return "$"+fmt(n); }
@@ -325,6 +328,19 @@ function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg
 function allFaPlayers(){
   const custom = Object.entries(mirror.fa.customPlayers||{}).map(([id,p])=>({id, lastOwner:null, name:p.name, pos:p.pos, origCost:0}));
   return [...faPlayersStatic, ...custom];
+}
+// Returns cached {amount,years} for a private path if we have it, otherwise
+// kicks off a background fetch (permitted only for your own team pre-reveal,
+// or anyone's after reveal) and re-renders once it resolves.
+function ensurePrivate(path){
+  if(privateCache[path] && privateCache[path] !== 'loading') return privateCache[path];
+  if(privateCache[path] === 'loading') return null;
+  privateCache[path] = 'loading';
+  get(ref(db, path)).then(snap=>{
+    privateCache[path] = snap.exists() ? snap.val() : 'missing';
+    renderApp();
+  }).catch(()=>{ privateCache[path] = 'missing'; renderApp(); });
+  return null;
 }
 
 /* =========================================================
@@ -394,19 +410,16 @@ function startListeners(){
     if(!myTeam) renderTeamPick();
     renderAll();
   });
-  onValue(ref(db, `${ROOT}/rfa`), snap=>{
-    const v = snap.val() || {};
-    mirror.rfa.activePlayerId = v.activePlayerId || null;
-    mirror.rfa.players = v.players || {};
-    renderAll();
-  });
-  onValue(ref(db, `${ROOT}/fa`), snap=>{
-    const v = snap.val() || {};
-    mirror.fa.activePlayerId = v.activePlayerId || null;
-    mirror.fa.players = v.players || {};
-    mirror.fa.customPlayers = v.customPlayers || {};
-    renderAll();
-  });
+  // rfa/fa: only PUBLIC data (activePlayerId, meta, status) is broadly
+  // listened to. Actual $ amounts live under /rfa/private and /fa/private
+  // and are fetched narrowly via ensurePrivate() — see above.
+  onValue(ref(db, `${ROOT}/rfa/activePlayerId`), snap=>{ mirror.rfa.activePlayerId = snap.val() || null; renderAll(); });
+  onValue(ref(db, `${ROOT}/rfa/meta`), snap=>{ mirror.rfa.meta = snap.val() || {}; renderAll(); });
+  onValue(ref(db, `${ROOT}/rfa/status`), snap=>{ mirror.rfa.status = snap.val() || {}; renderAll(); });
+  onValue(ref(db, `${ROOT}/fa/activePlayerId`), snap=>{ mirror.fa.activePlayerId = snap.val() || null; renderAll(); });
+  onValue(ref(db, `${ROOT}/fa/meta`), snap=>{ mirror.fa.meta = snap.val() || {}; renderAll(); });
+  onValue(ref(db, `${ROOT}/fa/status`), snap=>{ mirror.fa.status = snap.val() || {}; renderAll(); });
+  onValue(ref(db, `${ROOT}/fa/customPlayers`), snap=>{ mirror.fa.customPlayers = snap.val() || {}; renderAll(); });
 }
 
 /* =========================================================
@@ -447,9 +460,9 @@ function renderApp(){
    DASHBOARD
    ========================================================= */
 function viewDashboard(){
-  const rfaPending = rfaPlayers.filter(p=>!(mirror.rfa.players[p.id]||{}).done).length;
+  const rfaPending = rfaPlayers.filter(p=>!(mirror.rfa.meta[p.id]||{}).done).length;
   const faList = allFaPlayers();
-  const faPending = faList.filter(p=>!(mirror.fa.players[p.id]||{}).done).length;
+  const faPending = faList.filter(p=>!(mirror.fa.meta[p.id]||{}).done).length;
 
   const teamCards = Object.keys(OWNERS).map(tid=>{
     const t = mirror.teams[tid] || {cap:START_CAP[tid], startCap:START_CAP[tid], signings:{}};
@@ -486,16 +499,17 @@ function viewDashboard(){
 /* =========================================================
    RFA ROUND
    ========================================================= */
-function rfaRec(pid){ return mirror.rfa.players[pid] || {}; }
+function rfaMeta(pid){ return mirror.rfa.meta[pid] || {}; }
+function rfaStatus(pid, round, tid){ return (((mirror.rfa.status[pid]||{})[round])||{})[tid] || 'pending'; }
 function currentRfaPlayer(){
-  const remaining = rfaPlayers.filter(p=>!rfaRec(p.id).done);
+  const remaining = rfaPlayers.filter(p=>!rfaMeta(p.id).done);
   if(remaining.length===0) return null;
   let activeId = mirror.rfa.activePlayerId;
-  if(!activeId || rfaRec(activeId).done) activeId = remaining[0].id;
+  if(!activeId || rfaMeta(activeId).done) activeId = remaining[0].id;
   return rfaPlayers.find(p=>p.id===activeId);
 }
 function jumpRfa(id){
-  if(rfaRec(id).done) return;
+  if(rfaMeta(id).done) return;
   set(ref(db, `${ROOT}/rfa/activePlayerId`), id);
 }
 window.jumpRfa = jumpRfa;
@@ -503,11 +517,11 @@ window.jumpRfa = jumpRfa;
 function viewRFA(){
   const p = currentRfaPlayer();
   const queue = rfaPlayers.map(pl=>{
-    const rec = rfaRec(pl.id);
-    const done = rec.done;
+    const meta = rfaMeta(pl.id);
+    const done = meta.done;
     return `<div class="queue-item ${done?'done':''} ${p&&p.id===pl.id?'active':''}" onclick="jumpRfa('${pl.id}')">
       <div><div class="qname">${pl.name}</div><div class="qsub">${pl.pos} · ${OWNERS[pl.owner]}</div></div>
-      <div>${done? tagFor(rec.result) : `<span class="mono" style="color:var(--muted)">${money(pl.rfaStart)}</span>`}</div>
+      <div>${done? tagFor(meta.result) : `<span class="mono" style="color:var(--muted)">${money(pl.rfaStart)}</span>`}</div>
     </div>`;
   }).join("");
 
@@ -517,18 +531,18 @@ function viewRFA(){
       <div class="card empty"><div class="display">RFA Round Complete</div>All 20 restricted free agents have been retained or released.</div>`;
   }
 
-  const rec = rfaRec(p.id);
-  const roundNum = rec.round || 1;
-  const bidsForRound = (rec.bids && rec.bids[roundNum]) || {};
-  const revealedForRound = !!((rec.revealed||{})[roundNum]);
+  const meta = rfaMeta(p.id);
+  const roundNum = meta.round || 1;
+  const revealedForRound = !!((meta.revealed||{})[roundNum]);
   const eligibleTeams = Object.keys(OWNERS).filter(k=>k!==p.owner);
 
   const tiles = eligibleTeams.map(tid=>{
-    const b = bidsForRound[tid];
+    const st = rfaStatus(p.id, roundNum, tid);
     const mine = tid===myTeam;
+    const privPath = `${ROOT}/rfa/private/${p.id}/${roundNum}/${tid}`;
     let inner;
     if(mine && p.owner!==myTeam){
-      if(!b || b.status==='pending'){
+      if(st==='pending'){
         const yearOpts = [1,2,3,4].map(y=>`<option value="${y}" ${y===2?'selected':''}>${y}yr</option>`).join("");
         inner = `<div class="fields">
             <input type="number" min="0" step="0.25" id="bidin_${tid}" placeholder="$">
@@ -538,23 +552,28 @@ function viewRFA(){
             <button class="btn small turf" style="flex:1;" onclick="lockBid('${p.id}',${roundNum},'${tid}')">Lock</button>
             <button class="btn small ghost" onclick="passBid('${p.id}',${roundNum},'${tid}')">Pass</button>
           </div>`;
-      } else if(b.status==='passed'){
+      } else if(st==='passed'){
         inner = `<div class="amt">PASS</div>`;
       } else {
-        inner = `<div class="amt">${money(b.amount)} <span style="font-size:12px;color:var(--muted);">/ ${b.years}yr (you)</span></div>`;
+        const mydata = ensurePrivate(privPath);
+        inner = mydata ? `<div class="amt">${money(mydata.amount)} <span style="font-size:12px;color:var(--muted);">/ ${mydata.years}yr (you)</span></div>` : `<div class="amt">…</div>`;
       }
     } else {
-      if(!b || b.status==='pending') inner = `<div class="amt" style="color:var(--muted);">Waiting…</div>`;
-      else if(b.status==='passed') inner = `<div class="amt">PASS</div>`;
-      else inner = `<div class="amt">${revealedForRound? `${money(b.amount)} <span style="font-size:12px;color:var(--muted);">/ ${b.years}yr</span>` : 'LOCKED'}</div>`;
+      if(st==='pending') inner = `<div class="amt" style="color:var(--muted);">Waiting…</div>`;
+      else if(st==='passed') inner = `<div class="amt">PASS</div>`;
+      else if(!revealedForRound) inner = `<div class="amt">LOCKED</div>`;
+      else {
+        const data = ensurePrivate(privPath);
+        inner = data ? `<div class="amt">${money(data.amount)} <span style="font-size:12px;color:var(--muted);">/ ${data.years}yr</span></div>` : `<div class="amt">…</div>`;
+      }
     }
-    return `<div class="bid-tile ${b&&b.status==='locked'?'locked':''} ${b&&b.status==='passed'?'passed':''} ${mine?'mine':''}">
+    return `<div class="bid-tile ${st==='locked'?'locked':''} ${st==='passed'?'passed':''} ${mine?'mine':''}">
       <div class="who">${OWNERS[tid]}${mine?' (you)':''}</div>
       ${inner}
     </div>`;
   }).join("");
 
-  const allResponded = eligibleTeams.every(tid=>bidsForRound[tid] && bidsForRound[tid].status!=='pending');
+  const allResponded = eligibleTeams.every(tid=>rfaStatus(p.id, roundNum, tid)!=='pending');
   let roundControls = "";
   if(!revealedForRound){
     roundControls = `<button class="btn turf" ${allResponded?'':'disabled'} onclick="revealRound('${p.id}',${roundNum})">Reveal Round ${roundNum} Bids</button>
@@ -564,37 +583,46 @@ function viewRFA(){
   }
 
   let decisionPanel = "";
-  const round2Revealed = !!((rec.revealed||{})[2]);
-  if(round2Revealed && !rec.done){
-    const allBids = [];
+  const round2Revealed = !!((meta.revealed||{})[2]);
+  if(round2Revealed && !meta.done){
+    // gather every locked bid across both rounds; fetch private data for each
+    const lockedRefs = [];
     [1,2].forEach(rnd=>{
-      const rb = (rec.bids && rec.bids[rnd]) || {};
-      Object.entries(rb).forEach(([tid,b])=>{ if(b && b.status==='locked') allBids.push({tid, amount:b.amount, years:b.years}); });
+      eligibleTeams.forEach(tid=>{
+        if(rfaStatus(p.id, rnd, tid)==='locked') lockedRefs.push({rnd, tid, path:`${ROOT}/rfa/private/${p.id}/${rnd}/${tid}`});
+      });
     });
-    let finalPrice=0, finalTeam=null, finalYears=2;
-    allBids.forEach(b=>{ if(b.amount>finalPrice){finalPrice=b.amount;finalTeam=b.tid;finalYears=b.years;} });
-    const discountEligible = finalPrice>=10;
-    const matchPrice = discountEligible? Math.round(finalPrice*0.85*100)/100 : finalPrice;
-    const isOwner = myTeam===p.owner;
+    const resolved = lockedRefs.map(r=>({...r, data: ensurePrivate(r.path)}));
+    const stillLoading = resolved.some(r=>!r.data);
 
-    if(!finalTeam){
-      decisionPanel = `<div class="hairline"></div><div class="eyebrow-label">No Bids Received</div>
-        <p style="color:var(--muted);font-size:13px;">No other team bid on ${p.name}. ${OWNERS[p.owner]} retains at the RFA start price.</p>
-        ${isOwner? `<button class="btn turf" onclick="finalizeRfa('${p.id}', {decision:'unopposed', team:'${p.owner}', amount:${p.rfaStart}, years:2})">Retain at ${money(p.rfaStart)} / 2yr</button>`
-                  : `<p class="waiting-note">Waiting for ${OWNERS[p.owner]} to confirm.</p>`}`;
+    if(stillLoading){
+      decisionPanel = `<div class="hairline"></div><p style="color:var(--muted);font-size:13px;">Loading final offers…</p>`;
     } else {
-      decisionPanel = `<div class="hairline"></div><div class="eyebrow-label">Final Offer</div>
-        <div class="led led-lg">${money(finalPrice)} <span style="font-size:22px;color:var(--muted);">/ ${finalYears}yr</span></div>
-        <div class="discount-note">High bid: ${OWNERS[finalTeam]} &nbsp;·&nbsp; Match price for ${OWNERS[p.owner]}: ${money(matchPrice)} / ${finalYears}yr ${discountEligible? '(15% discount)':'(no discount — under $10)'}</div>
-        ${isOwner? `<div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap;">
-          <button class="btn turf" onclick="finalizeRfa('${p.id}', {decision:'matched', team:'${p.owner}', amount:${matchPrice}, years:${finalYears}})">Match — Retain at ${money(matchPrice)} / ${finalYears}yr</button>
-          <button class="btn alert" onclick="finalizeRfa('${p.id}', {decision:'lost', team:'${finalTeam}', amount:${finalPrice}, years:${finalYears}})">Decline — ${OWNERS[finalTeam]} Signs at ${money(finalPrice)} / ${finalYears}yr</button>
-        </div>` : `<p class="waiting-note">Waiting for ${OWNERS[p.owner]} to match or decline.</p>`}`;
+      let finalPrice=0, finalTeam=null, finalYears=2;
+      resolved.forEach(r=>{ if(r.data.amount>finalPrice){finalPrice=r.data.amount;finalTeam=r.tid;finalYears=r.data.years;} });
+      const discountEligible = finalPrice>=10;
+      const matchPrice = discountEligible? Math.round(finalPrice*0.85*100)/100 : finalPrice;
+      const isOwner = myTeam===p.owner;
+
+      if(!finalTeam){
+        decisionPanel = `<div class="hairline"></div><div class="eyebrow-label">No Bids Received</div>
+          <p style="color:var(--muted);font-size:13px;">No other team bid on ${p.name}. ${OWNERS[p.owner]} retains at the RFA start price.</p>
+          ${isOwner? `<button class="btn turf" onclick="finalizeRfa('${p.id}', {decision:'unopposed', team:'${p.owner}', amount:${p.rfaStart}, years:2})">Retain at ${money(p.rfaStart)} / 2yr</button>`
+                    : `<p class="waiting-note">Waiting for ${OWNERS[p.owner]} to confirm.</p>`}`;
+      } else {
+        decisionPanel = `<div class="hairline"></div><div class="eyebrow-label">Final Offer</div>
+          <div class="led led-lg">${money(finalPrice)} <span style="font-size:22px;color:var(--muted);">/ ${finalYears}yr</span></div>
+          <div class="discount-note">High bid: ${OWNERS[finalTeam]} &nbsp;·&nbsp; Match price for ${OWNERS[p.owner]}: ${money(matchPrice)} / ${finalYears}yr ${discountEligible? '(15% discount)':'(no discount — under $10)'}</div>
+          ${isOwner? `<div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap;">
+            <button class="btn turf" onclick="finalizeRfa('${p.id}', {decision:'matched', team:'${p.owner}', amount:${matchPrice}, years:${finalYears}})">Match — Retain at ${money(matchPrice)} / ${finalYears}yr</button>
+            <button class="btn alert" onclick="finalizeRfa('${p.id}', {decision:'lost', team:'${finalTeam}', amount:${finalPrice}, years:${finalYears}})">Decline — ${OWNERS[finalTeam]} Signs at ${money(finalPrice)} / ${finalYears}yr</button>
+          </div>` : `<p class="waiting-note">Waiting for ${OWNERS[p.owner]} to match or decline.</p>`}`;
+      }
     }
   }
 
   return `
-  <div class="section-head"><div><h2>RFA Round</h2><div class="desc">${rfaPlayers.filter(x=>!rfaRec(x.id).done).length} of ${rfaPlayers.length} remaining · your bids are hidden from other teams until reveal.</div></div></div>
+  <div class="section-head"><div><h2>RFA Round</h2><div class="desc">${rfaPlayers.filter(x=>!rfaMeta(x.id).done).length} of ${rfaPlayers.length} remaining · your bids are hidden from other teams until reveal.</div></div></div>
   <div class="grid-2">
     <div class="plaque"><div class="bc2"></div><div class="bc3"></div>
       <div class="player-head">
@@ -621,16 +649,17 @@ async function lockBid(pid, round, tid){
   const val = parseFloat(document.getElementById(`bidin_${tid}`).value);
   const years = parseInt(document.getElementById(`bidyr_${tid}`).value);
   if(isNaN(val) || val<0){ toast("Enter a valid bid amount"); return; }
-  await update(ref(db, `${ROOT}/rfa/players/${pid}/bids/${round}/${tid}`), {status:'locked', amount:val, years});
+  await set(ref(db, `${ROOT}/rfa/private/${pid}/${round}/${tid}`), {amount:val, years});
+  await set(ref(db, `${ROOT}/rfa/status/${pid}/${round}/${tid}`), 'locked');
 }
 async function passBid(pid, round, tid){
-  await update(ref(db, `${ROOT}/rfa/players/${pid}/bids/${round}/${tid}`), {status:'passed'});
+  await set(ref(db, `${ROOT}/rfa/status/${pid}/${round}/${tid}`), 'passed');
 }
 async function revealRound(pid, round){
-  await set(ref(db, `${ROOT}/rfa/players/${pid}/revealed/${round}`), true);
+  await set(ref(db, `${ROOT}/rfa/meta/${pid}/revealed/${round}`), true);
 }
 async function advanceRound(pid){
-  await set(ref(db, `${ROOT}/rfa/players/${pid}/round`), 2);
+  await set(ref(db, `${ROOT}/rfa/meta/${pid}/round`), 2);
 }
 async function finalizeRfa(pid, result){
   const p = rfaPlayers.find(x=>x.id===pid);
@@ -641,7 +670,7 @@ async function finalizeRfa(pid, result){
   }
   await runTransaction(ref(db, `${ROOT}/teams/${result.team}/cap`), cur => (cur==null? team.cap : cur) - result.amount);
   await update(ref(db, `${ROOT}/teams/${result.team}/signings/${pid}`), {name:p.name, pos:p.pos, amount:result.amount, years:result.years, type:'RFA'});
-  await update(ref(db, `${ROOT}/rfa/players/${pid}`), {done:true, result});
+  await update(ref(db, `${ROOT}/rfa/meta/${pid}`), {done:true, result});
   toast(`${p.name} → ${OWNERS[result.team]} · ${money(result.amount)} / ${result.years} yrs`);
 }
 window.lockBid=lockBid; window.passBid=passBid; window.revealRound=revealRound; window.advanceRound=advanceRound; window.finalizeRfa=finalizeRfa;
@@ -649,10 +678,11 @@ window.lockBid=lockBid; window.passBid=passBid; window.revealRound=revealRound; 
 /* =========================================================
    FA AUCTION
    ========================================================= */
-function faRec(pid){ return mirror.fa.players[pid] || {}; }
+function faMeta(pid){ return mirror.fa.meta[pid] || {}; }
+function faStatus(pid, tid){ return ((mirror.fa.status[pid]||{})[tid]) || 'pending'; }
 function viewFA(){
   const faList = allFaPlayers();
-  const remaining = faList.filter(p=>!faRec(p.id).done);
+  const remaining = faList.filter(p=>!faMeta(p.id).done);
   const search = window.__faSearch || "";
   const filtered = remaining.filter(p=>p.name.toLowerCase().includes(search.toLowerCase()));
 
@@ -664,52 +694,54 @@ function viewFA(){
 
   let stage;
   const activeId = mirror.fa.activePlayerId;
-  const activeDone = activeId && faRec(activeId).done;
+  const activeDone = activeId && faMeta(activeId).done;
   if(!activeId || activeDone){
     stage = `<div class="plaque empty"><div class="bc2"></div><div class="bc3"></div><div class="display">Nominate a Player</div>Pick anyone from the market list to open the offer sheet.</div>`;
   } else {
     const p = faList.find(x=>x.id===activeId);
-    const rec = faRec(activeId);
-    const isRookie = !!rec.isRookie;
-    const revealed = !!rec.revealed;
-    const offers = rec.offers || {};
+    const meta = faMeta(activeId);
+    const isRookie = !!meta.isRookie;
+    const revealed = !!meta.revealed;
     const yrChoices = isRookie? [1,2] : [1,2,3,4];
 
     const tiles = Object.keys(OWNERS).map(tid=>{
-      const o = offers[tid];
+      const st = faStatus(activeId, tid);
       const mine = tid===myTeam;
       const team = mirror.teams[tid] || {cap:START_CAP[tid]};
+      const privPath = `${ROOT}/fa/private/${activeId}/${tid}`;
       let inner;
       if(mine){
-        if(!o || o.status==='pending'){
+        if(st==='pending'){
           const yearOpts = yrChoices.map(y=>`<option value="${y}">${y}yr</option>`).join("");
           inner = `<div class="fields"><input type="number" min="0" step="0.25" id="off_amt" placeholder="$"><select id="off_yrs">${yearOpts}</select></div>
             <div class="btnrow">
               <button class="btn small turf" style="flex:1;" onclick="lockOffer('${activeId}','${tid}')">Lock</button>
               <button class="btn small ghost" onclick="passOffer('${activeId}','${tid}')">Pass</button>
             </div>`;
-        } else if(o.status==='passed'){
+        } else if(st==='passed'){
           inner = `<div class="offer-readout" style="color:var(--muted);">PASS</div>`;
         } else {
-          inner = `<div class="offer-readout">${money(o.amount)} <span style="font-size:12px;color:var(--muted);">/ ${o.years}yr (you)</span></div>`;
+          const mydata = ensurePrivate(privPath);
+          inner = mydata ? `<div class="offer-readout">${money(mydata.amount)} <span style="font-size:12px;color:var(--muted);">/ ${mydata.years}yr (you)</span></div>` : `<div class="offer-readout">…</div>`;
+          if(revealed) inner += `<button class="btn small turf block" onclick="signOffer('${activeId}','${tid}')">Sign This Offer</button>`;
         }
       } else {
-        if(!o || o.status==='pending') inner = `<div class="offer-readout" style="color:var(--muted);font-size:14px;">Waiting…</div>`;
-        else if(o.status==='passed') inner = `<div class="offer-readout" style="color:var(--muted);">PASS</div>`;
+        if(st==='pending') inner = `<div class="offer-readout" style="color:var(--muted);font-size:14px;">Waiting…</div>`;
+        else if(st==='passed') inner = `<div class="offer-readout" style="color:var(--muted);">PASS</div>`;
         else if(!revealed) inner = `<div class="offer-readout">LOCKED</div>`;
-        else inner = `<div class="offer-readout">${money(o.amount)} <span style="font-size:12px;color:var(--muted);">/ ${o.years}yr</span></div>
-          <button class="btn small turf block" onclick="signOffer('${activeId}','${tid}')">Sign This Offer</button>`;
+        else {
+          const data = ensurePrivate(privPath);
+          inner = data ? `<div class="offer-readout">${money(data.amount)} <span style="font-size:12px;color:var(--muted);">/ ${data.years}yr</span></div>
+            <button class="btn small turf block" onclick="signOffer('${activeId}','${tid}')">Sign This Offer</button>` : `<div class="offer-readout">…</div>`;
+        }
       }
-      if(revealed && mine && o && o.status==='locked'){
-        inner += `<button class="btn small turf block" onclick="signOffer('${activeId}','${tid}')">Sign This Offer</button>`;
-      }
-      return `<div class="offer-tile ${o&&o.status==='locked'?'locked':''} ${o&&o.status==='passed'?'passed':''} ${mine?'mine':''}">
+      return `<div class="offer-tile ${st==='locked'?'locked':''} ${st==='passed'?'passed':''} ${mine?'mine':''}">
         <div class="who">${OWNERS[tid]}${mine?' (you)':''}<br><span style="color:var(--muted);font-weight:400;">${money(team.cap)} avail.</span></div>
         ${inner}
       </div>`;
     }).join("");
 
-    const anyLocked = Object.values(offers).some(o=>o && o.status==='locked');
+    const anyLocked = Object.keys(OWNERS).some(tid=>faStatus(activeId, tid)==='locked');
 
     stage = `<div class="plaque"><div class="bc2"></div><div class="bc3"></div>
       <div class="player-head"><div><div class="eyebrow-label">On The Market</div><h3 class="player-name">${p.name}</h3>
@@ -747,7 +779,7 @@ function viewFA(){
   `;
 }
 async function nominateFA(pid){ await set(ref(db, `${ROOT}/fa/activePlayerId`), pid); }
-async function toggleRookie(pid, checked){ await set(ref(db, `${ROOT}/fa/players/${pid}/isRookie`), checked); }
+async function toggleRookie(pid, checked){ await set(ref(db, `${ROOT}/fa/meta/${pid}/isRookie`), checked); }
 async function lockOffer(pid, tid){
   const amt = parseFloat(document.getElementById('off_amt').value);
   const years = parseInt(document.getElementById('off_yrs').value);
@@ -757,22 +789,24 @@ async function lockOffer(pid, tid){
   const teamSnap = await get(ref(db, `${ROOT}/teams/${tid}`));
   const team = teamSnap.val();
   if(amt > team.cap){ toast(`You only have ${money(team.cap)} available`); return; }
-  await update(ref(db, `${ROOT}/fa/players/${pid}/offers/${tid}`), {status:'locked', amount:amt, years});
+  await set(ref(db, `${ROOT}/fa/private/${pid}/${tid}`), {amount:amt, years});
+  await set(ref(db, `${ROOT}/fa/status/${pid}/${tid}`), 'locked');
 }
-async function passOffer(pid, tid){ await update(ref(db, `${ROOT}/fa/players/${pid}/offers/${tid}`), {status:'passed'}); }
-async function revealOffers(pid){ await set(ref(db, `${ROOT}/fa/players/${pid}/revealed`), true); }
+async function passOffer(pid, tid){ await set(ref(db, `${ROOT}/fa/status/${pid}/${tid}`), 'passed'); }
+async function revealOffers(pid){ await set(ref(db, `${ROOT}/fa/meta/${pid}/revealed`), true); }
 async function signOffer(pid, tid){
   const faList = allFaPlayers();
   const p = faList.find(x=>x.id===pid);
-  const rec = faRec(pid);
-  const o = rec.offers[tid];
+  const meta = faMeta(pid);
+  const oSnap = await get(ref(db, `${ROOT}/fa/private/${pid}/${tid}`));
+  const o = oSnap.val();
   const teamSnap = await get(ref(db, `${ROOT}/teams/${tid}`));
   const team = teamSnap.val();
   if(o.amount > team.cap){ toast(`${OWNERS[tid]} no longer has enough cap`); return; }
-  const rfaOption = rec.isRookie && o.years===2;
+  const rfaOption = meta.isRookie && o.years===2;
   await runTransaction(ref(db, `${ROOT}/teams/${tid}/cap`), cur => (cur==null? team.cap : cur) - o.amount);
   await update(ref(db, `${ROOT}/teams/${tid}/signings/${pid}`), {name:p.name, pos:p.pos, amount:o.amount, years:o.years, type:'FA', rfaOption});
-  await update(ref(db, `${ROOT}/fa/players/${pid}`), {done:true, result:{team:tid, amount:o.amount, years:o.years}});
+  await update(ref(db, `${ROOT}/fa/meta/${pid}`), {done:true, result:{team:tid, amount:o.amount, years:o.years}});
   toast(`${p.name} signed by ${OWNERS[tid]} · ${money(o.amount)} / ${o.years} yr${rfaOption?' (+RFA opt)':''}`);
 }
 async function skipFA(pid){ await set(ref(db, `${ROOT}/fa/activePlayerId`), null); }
