@@ -1088,7 +1088,7 @@ window.resyncLeagueData = resyncLeagueData;
    invention), so this can only ever compare rosters, not $.
    ========================================================= */
 const SLEEPER_LEAGUE_ID = "1383959517712093184";
-let sleeperUI = { rosters:null, users:null, loading:false, error:null, results:null, mappingDraft:{} };
+let sleeperUI = { rosters:null, users:null, loading:false, error:null, results:null, mappingDraft:{}, nflFillResults:null };
 
 async function fetchJSON(url){
   const r = await fetch(url);
@@ -1175,12 +1175,21 @@ function viewSleeper(){
   const resultsBlock = sleeperUI.results ? renderSleeperResults() :
     `<div class="card empty"><div class="display">Ready to Check</div>Compares live Sleeper rosters against what's recorded in this app.<div style="margin-top:14px;"><button class="btn turf" onclick="runSleeperCheck()">Run Roster Check</button></div></div>`;
 
+  const nflBlock = sleeperUI.nflFillResults ? renderNflFillResults() :
+    `<div class="card">
+      <div class="eyebrow-label">Fill Missing NFL Teams</div>
+      <p style="font-size:13px;color:var(--muted);margin:4px 0 12px;">Looks up every player with a blank NFL team against Sleeper's live player database (name-matched) and fills in the ones it's confident about. Never overwrites a team that's already filled in.</p>
+      <button class="btn turf" onclick="runNflTeamFill()">Find Missing NFL Teams</button>
+    </div>`;
+
   return `
   <div class="section-head">
     <div><h2>Sleeper Sync</h2><div class="desc">Read-only — pulls your real Sleeper rosters live. Can't push changes back to Sleeper, and Sleeper has no concept of salary/years, so this only checks who's on which roster.</div></div>
     <button class="btn ghost small" onclick="remapSleeper()">Redo Team Mapping</button>
   </div>
   ${resultsBlock}
+  <div class="hairline"></div>
+  ${nflBlock}
   `;
 }
 
@@ -1317,6 +1326,79 @@ function renderSleeperResults(){
     </div>`;
   }).join("");
   return `<div style="margin-bottom:14px;"><button class="btn small ghost" onclick="runSleeperCheck()">Re-run Check</button></div>${cards}`;
+}
+
+async function runNflTeamFill(){
+  sleeperUI.loading = true; renderApp();
+  try{
+    const players = await loadSleeperPlayers();
+    // index sleeper players by position for faster fuzzy lookup
+    const byPos = {};
+    Object.values(players).forEach(p=>{
+      if(!p.position || !p.team) return; // skip anyone with no current team, nothing useful to offer
+      const full = `${p.first_name||''} ${p.last_name||''}`.trim();
+      if(!full) return;
+      (byPos[p.position] = byPos[p.position] || []).push({name:full, team:p.team});
+    });
+
+    const suggestions = [];
+    Object.keys(OWNERS).forEach(tid=>{
+      activePlayers(tid).forEach(pl=>{
+        if(pl.nflTeam) return; // never touch a field that's already filled in
+        const candidates = byPos[pl.pos] || [];
+        let best=null, bestScore=0;
+        candidates.forEach(c=>{
+          const score = nameSimilarity(pl.name, c.name);
+          if(score>bestScore){ bestScore=score; best=c; }
+        });
+        if(best && bestScore >= FUZZY_MATCH_THRESHOLD){
+          suggestions.push({tid, pid:pl.id, name:pl.name, team:best.team});
+        }
+      });
+    });
+    sleeperUI.nflFillResults = suggestions;
+  }catch(e){
+    toast("Lookup failed: "+e.message);
+  }
+  sleeperUI.loading = false;
+  renderApp();
+}
+window.runNflTeamFill = runNflTeamFill;
+
+async function applyNflFix(tid, pid, team){
+  await update(ref(db, `${ROOT}/rosters/${tid}/${pid}`), {nflTeam:team});
+  sleeperUI.nflFillResults = sleeperUI.nflFillResults.filter(s=>!(s.tid===tid && s.pid===pid));
+  toast(`Set to ${team}`);
+  renderApp();
+}
+window.applyNflFix = applyNflFix;
+
+async function applyAllNflFixes(){
+  const list = sleeperUI.nflFillResults;
+  if(!list || !list.length) return;
+  await Promise.all(list.map(s=> update(ref(db, `${ROOT}/rosters/${s.tid}/${s.pid}`), {nflTeam:s.team}) ));
+  toast(`Filled in ${list.length} NFL team${list.length===1?'':'s'}`);
+  sleeperUI.nflFillResults = [];
+  renderApp();
+}
+window.applyAllNflFixes = applyAllNflFixes;
+
+function renderNflFillResults(){
+  const list = sleeperUI.nflFillResults;
+  if(!list.length){
+    return `<div class="card empty"><div class="display">All Set</div>No confident matches left to fill — anything still blank didn't have a close enough name match in Sleeper's data.<div style="margin-top:14px;"><button class="btn small ghost" onclick="runNflTeamFill()">Re-run</button></div></div>`;
+  }
+  const rows = list.map(s=>`<tr>
+    <td>${OWNERS[s.tid]}</td><td>${s.name}</td><td class="mono" style="color:var(--gold-bright);">${s.team}</td>
+    <td><button class="btn small turf" style="padding:4px 10px;font-size:11px;" onclick="applyNflFix('${s.tid}','${s.pid}','${s.team}')">Fill</button></td>
+  </tr>`).join("");
+  return `<div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+      <div class="eyebrow-label" style="margin:0;">${list.length} Match${list.length===1?'':'es'} Found</div>
+      <button class="btn small turf" onclick="applyAllNflFixes()">Fill All ${list.length}</button>
+    </div>
+    <table><thead><tr><th>Team</th><th>Player</th><th>NFL Team</th><th></th></tr></thead><tbody>${rows}</tbody></table>
+  </div>`;
 }
 
 /* =========================================================
