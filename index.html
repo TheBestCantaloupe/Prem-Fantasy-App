@@ -756,7 +756,7 @@ function viewDashboard(){
 /* =========================================================
    ROSTER MANAGEMENT
    ========================================================= */
-let rosterUI = { viewTeam: null, actionPid: null, actionType: null };
+let rosterUI = { viewTeam: null, actionPid: null, actionType: null, editingCap: false };
 
 function teamRoster(tid){ return mirror.rosters[tid] || {}; }
 function activePlayers(tid){
@@ -807,7 +807,8 @@ function viewRosters(){
     const acting = rosterUI.actionPid===p.id;
     let actionRow = '';
     if(isMine){
-      actionRow = `<div class="btnrow" style="gap:6px;">
+      actionRow = `<div class="btnrow" style="gap:6px;flex-wrap:wrap;">
+        <button class="btn small ghost" onclick="openRosterAction('${p.id}','edit')">Edit</button>
         <button class="btn small alert" onclick="openRosterAction('${p.id}','cut')">Cut</button>
         <button class="btn small ${canExtend?'turf':'ghost'}" ${canExtend?'':'disabled'} onclick="openRosterAction('${p.id}','extend')">Extend</button>
         <button class="btn small ${canTag?'':'ghost'}" ${canTag?'':'disabled'} onclick="openRosterAction('${p.id}','tag')">Tag</button>
@@ -836,6 +837,29 @@ function viewRosters(){
         <p style="font-size:13px;color:var(--muted);margin:4px 0 10px;">Tag salary: ${money(tagSal)}/yr (top-3 ${p.pos} average, or +15% if already top-3 paid). One per team per season, max 2 per player lifetime. Tags used so far: ${p.franchiseTagsUsed||0}/2.</p>
         <div class="btnrow"><button class="btn small turf" onclick="confirmTag('${p.id}')">Confirm Tag</button><button class="btn small ghost" onclick="closeRosterAction()">Cancel</button></div>
       </div></td></tr>`;
+    } else if(acting && rosterUI.actionType==='edit'){
+      const posOpts = ['QB','RB','WR','TE','PK'].map(x=>`<option value="${x}" ${x===p.pos?'selected':''}>${x}</option>`).join("");
+      const statusOpts = ['active','ir','taxi','cut'].map(x=>`<option value="${x}" ${x===p.status?'selected':''}>${x}</option>`).join("");
+      panel = `<tr><td colspan="7"><div class="card" style="margin:6px 0;">
+        <div class="eyebrow-label">Edit ${p.name} — every field is directly editable</div>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:10px 0;">
+          <div><label>Name</label><input type="text" id="ed_name" value="${p.name.replace(/"/g,'&quot;')}"></div>
+          <div><label>Position</label><select id="ed_pos">${posOpts}</select></div>
+          <div><label>NFL Team</label><input type="text" id="ed_nfl" value="${p.nflTeam||''}"></div>
+          <div><label>Status</label><select id="ed_status">${statusOpts}</select></div>
+          <div><label>Salary ($)</label><input type="number" step="0.25" id="ed_salary" value="${p.salary}"></div>
+          <div><label>Years Remaining</label><input type="number" step="1" id="ed_yrsleft" value="${p.yearsRemaining}"></div>
+          <div><label>Total Contract Yrs</label><input type="number" step="1" id="ed_yrstotal" value="${p.contractYears||1}"></div>
+          <div><label>Acquisition</label><input type="text" id="ed_acq" value="${p.acq||''}"></div>
+          <div><label>Franchise Tags Used</label><input type="number" step="1" id="ed_fttags" value="${p.franchiseTagsUsed||0}"></div>
+          <div><label>Extensions Used</label><input type="number" step="1" id="ed_ext" value="${p.extensionsUsed||0}"></div>
+        </div>
+        <div class="btnrow">
+          <button class="btn small turf" onclick="saveRosterEdit('${p.id}')">Save Changes</button>
+          <button class="btn small ghost" onclick="closeRosterAction()">Cancel</button>
+          <button class="btn small alert" style="margin-left:auto;" onclick="deleteRosterPlayer('${p.id}')">Delete Player Entirely</button>
+        </div>
+      </div></td></tr>`;
     }
     return `<tr>
       <td>${p.name}${p.status==='taxi'?' <span class="tag fa">TAXI</span>':''}${p.status==='ir'?' <span class="tag rfa-lost">IR</span>':''}</td>
@@ -847,16 +871,42 @@ function viewRosters(){
     </tr>${panel}`;
   }).join("");
 
+  const capEditing = isMine && rosterUI.editingCap;
+  const capBlock = capEditing
+    ? `<div style="display:flex;gap:8px;align-items:flex-end;">
+        <div style="flex:1;"><label>Available Cap ($)</label><input type="number" step="0.05" id="ed_cap" value="${team.cap}"></div>
+        <button class="btn small turf" onclick="saveCapEdit()">Save</button>
+        <button class="btn small ghost" onclick="cancelCapEdit()">Cancel</button>
+      </div>`
+    : `<div class="led led-lg" style="font-size:30px;">${money(team.cap)} <span style="font-size:14px;color:var(--muted);">available this season</span>
+        ${isMine? `<button class="btn small ghost" style="margin-left:10px;vertical-align:middle;" onclick="startCapEdit()">Edit</button>`:''}
+      </div>`;
+
+  const addPlayerForm = isMine ? `
+  <div class="card" style="margin-top:16px;">
+    <div class="eyebrow-label">Add a Player Not on the Sheet</div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:10px 0;">
+      <div><label>Name</label><input type="text" id="new_name" placeholder="Player name"></div>
+      <div><label>Position</label><select id="new_pos"><option>QB</option><option>RB</option><option>WR</option><option>TE</option><option>PK</option></select></div>
+      <div><label>NFL Team</label><input type="text" id="new_nfl" placeholder="e.g. KC"></div>
+      <div><label>Salary ($)</label><input type="number" step="0.25" id="new_salary" value="1"></div>
+      <div><label>Years Remaining</label><input type="number" step="1" id="new_yrsleft" value="1"></div>
+      <div><label>Total Contract Yrs</label><input type="number" step="1" id="new_yrstotal" value="1"></div>
+      <div><label>Acquisition</label><input type="text" id="new_acq" placeholder="FA / ROOKIE / TRADE…"></div>
+    </div>
+    <button class="btn turf small" onclick="addRosterPlayer()">Add to Roster</button>
+  </div>` : '';
+
   return `
   <div class="section-head">
-    <div><h2>Rosters</h2><div class="desc">Cuts, extensions, and franchise tags apply league rules automatically. You can only act on your own roster.</div></div>
+    <div><h2>Rosters</h2><div class="desc">Every field is directly editable. Cuts, extensions, and tags still apply league math automatically if you'd rather use those.</div></div>
     <button class="btn ghost small" onclick="resyncLeagueData()">Resync Latest League Data</button>
   </div>
   <div style="margin-bottom:14px;">${teamTabs}</div>
   <div class="grid-3" style="margin-bottom:22px;">
     <div class="card">
       <div class="eyebrow-label">${OWNERS[vt]} — Cap Snapshot</div>
-      <div class="led led-lg" style="font-size:30px;">${money(team.cap)} <span style="font-size:14px;color:var(--muted);">available this season</span></div>
+      ${capBlock}
       <div class="discount-note">Future dead cap on the books — next season: ${money(fch.plus1)} · season after: ${money(fch.plus2)} · beyond: ${money(fch.plus3plus)}</div>
     </div>
     <div class="card">
@@ -876,14 +926,74 @@ function viewRosters(){
       <tbody>${rows}</tbody>
     </table>
   </div>
+  ${addPlayerForm}
   `;
 }
-function switchRosterTeam(tid){ rosterUI = {viewTeam:tid, actionPid:null, actionType:null}; renderApp(); }
+function switchRosterTeam(tid){ rosterUI = {viewTeam:tid, actionPid:null, actionType:null, editingCap:false}; renderApp(); }
 window.switchRosterTeam = switchRosterTeam;
 function openRosterAction(pid, type){ rosterUI.actionPid=pid; rosterUI.actionType=type; renderApp(); }
 window.openRosterAction = openRosterAction;
 function closeRosterAction(){ rosterUI.actionPid=null; rosterUI.actionType=null; renderApp(); }
 window.closeRosterAction = closeRosterAction;
+function startCapEdit(){ rosterUI.editingCap = true; renderApp(); }
+window.startCapEdit = startCapEdit;
+function cancelCapEdit(){ rosterUI.editingCap = false; renderApp(); }
+window.cancelCapEdit = cancelCapEdit;
+async function saveCapEdit(){
+  const val = parseFloat(document.getElementById('ed_cap').value);
+  if(isNaN(val)){ toast("Enter a valid number"); return; }
+  await set(ref(db, `${ROOT}/teams/${myTeam}/cap`), val);
+  rosterUI.editingCap = false;
+  toast("Cap updated");
+}
+window.saveCapEdit = saveCapEdit;
+
+async function saveRosterEdit(pid){
+  const patch = {
+    name: document.getElementById('ed_name').value.trim(),
+    pos: document.getElementById('ed_pos').value,
+    nflTeam: document.getElementById('ed_nfl').value.trim(),
+    status: document.getElementById('ed_status').value,
+    salary: parseFloat(document.getElementById('ed_salary').value) || 0,
+    yearsRemaining: parseInt(document.getElementById('ed_yrsleft').value) || 0,
+    contractYears: parseInt(document.getElementById('ed_yrstotal').value) || 1,
+    acq: document.getElementById('ed_acq').value.trim(),
+    franchiseTagsUsed: parseInt(document.getElementById('ed_fttags').value) || 0,
+    extensionsUsed: parseInt(document.getElementById('ed_ext').value) || 0
+  };
+  if(!patch.name){ toast("Name can't be blank"); return; }
+  await update(ref(db, `${ROOT}/rosters/${myTeam}/${pid}`), patch);
+  toast(`${patch.name} updated`);
+  closeRosterAction();
+}
+window.saveRosterEdit = saveRosterEdit;
+
+async function deleteRosterPlayer(pid){
+  if(!confirm("Delete this player from the roster entirely? This does not touch the cap or create dead cap — use Cut for that instead. This is just for fixing bad data.")) return;
+  await set(ref(db, `${ROOT}/rosters/${myTeam}/${pid}`), null);
+  toast("Player removed");
+  closeRosterAction();
+}
+window.deleteRosterPlayer = deleteRosterPlayer;
+
+async function addRosterPlayer(){
+  const name = document.getElementById('new_name').value.trim();
+  if(!name){ toast("Enter a player name"); return; }
+  const pid = "manual_"+Date.now();
+  const entry = {
+    name, pos: document.getElementById('new_pos').value,
+    nflTeam: document.getElementById('new_nfl').value.trim(),
+    salary: parseFloat(document.getElementById('new_salary').value) || 0,
+    yearsRemaining: parseInt(document.getElementById('new_yrsleft').value) || 1,
+    contractYears: parseInt(document.getElementById('new_yrstotal').value) || 1,
+    acq: document.getElementById('new_acq').value.trim() || 'FA',
+    status: 'active', franchiseTagsUsed:0, extensionsUsed:0
+  };
+  await set(ref(db, `${ROOT}/rosters/${myTeam}/${pid}`), entry);
+  toast(`${name} added to roster`);
+  ['new_name','new_nfl','new_acq'].forEach(id=>document.getElementById(id).value='');
+}
+window.addRosterPlayer = addRosterPlayer;
 
 async function confirmCut(pid){
   const tid = myTeam;
