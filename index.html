@@ -1200,11 +1200,30 @@ window.saveSleeperMapping = saveSleeperMapping;
 function remapSleeper(){ sleeperUI.mappingDraft = {...mirror.sleeperMapping}; set(ref(db, `${ROOT}/sleeperMapping`), null); }
 window.remapSleeper = remapSleeper;
 
+function levenshtein(a, b){
+  const m = a.length, n = b.length;
+  const dp = Array.from({length:m+1}, (_,i)=>[i, ...Array(n).fill(0)]);
+  for(let j=0;j<=n;j++) dp[0][j]=j;
+  for(let i=1;i<=m;i++){
+    for(let j=1;j<=n;j++){
+      dp[i][j] = a[i-1]===b[j-1] ? dp[i-1][j-1] : 1+Math.min(dp[i-1][j], dp[i][j-1], dp[i-1][j-1]);
+    }
+  }
+  return dp[m][n];
+}
+function nameSimilarity(a, b){
+  const na = normName(a), nb = normName(b);
+  if(!na || !nb) return 0;
+  const dist = levenshtein(na, nb);
+  return 1 - dist / Math.max(na.length, nb.length);
+}
+const FUZZY_MATCH_THRESHOLD = 0.72;
+
 async function runSleeperCheck(){
   sleeperUI.loading = true; renderApp();
   try{
     const players = await loadSleeperPlayers();
-    const byRoster = {}; // ourTeamKey -> [normalized sleeper names]
+    const byRoster = {}; // ourTeamKey -> [sleeper names]
     sleeperUI.rosters.forEach(r=>{
       const tid = mirror.sleeperMapping[r.roster_id];
       if(!tid) return;
@@ -1220,10 +1239,31 @@ async function runSleeperCheck(){
       const ourPlayers = activePlayers(tid);
       const ourNorm = ourPlayers.map(p=>normName(p.name));
 
-      const missingFromApp = sleeperNames.filter((n,i)=> !ourNorm.includes(sleeperNorm[i]));
-      const extraInApp = ourPlayers.filter(p=> !sleeperNorm.includes(normName(p.name))).map(p=>p.name);
+      const missingNames = sleeperNames.filter((n,i)=> !ourNorm.includes(sleeperNorm[i]));
+      const extraPlayers = ourPlayers.filter(p=> !sleeperNorm.includes(normName(p.name)));
 
-      return {tid, missingFromApp, extraInApp};
+      // fuzzy-pair each missing Sleeper name against each unmatched app player;
+      // anything above threshold is almost certainly the same person misspelled
+      const usedExtra = new Set();
+      const spellingFixes = [];
+      const trueMissing = [];
+      missingNames.forEach(sName=>{
+        let best = null, bestScore = 0;
+        extraPlayers.forEach(ep=>{
+          if(usedExtra.has(ep.id)) return;
+          const score = nameSimilarity(sName, ep.name);
+          if(score > bestScore){ bestScore = score; best = ep; }
+        });
+        if(best && bestScore >= FUZZY_MATCH_THRESHOLD){
+          usedExtra.add(best.id);
+          spellingFixes.push({tid, pid:best.id, from:best.name, to:sName});
+        } else {
+          trueMissing.push(sName);
+        }
+      });
+      const trueExtra = extraPlayers.filter(ep=>!usedExtra.has(ep.id)).map(p=>p.name);
+
+      return {tid, trueMissing, trueExtra, spellingFixes};
     });
     sleeperUI.results = results;
   }catch(e){
@@ -1234,13 +1274,46 @@ async function runSleeperCheck(){
 }
 window.runSleeperCheck = runSleeperCheck;
 
+async function applySpellingFix(tid, pid, newName){
+  await update(ref(db, `${ROOT}/rosters/${tid}/${pid}`), {name:newName});
+  // remove this fix from the pending list so the UI updates immediately
+  const r = sleeperUI.results.find(x=>x.tid===tid);
+  if(r) r.spellingFixes = r.spellingFixes.filter(f=>f.pid!==pid);
+  toast(`Renamed to ${newName}`);
+  renderApp();
+}
+window.applySpellingFix = applySpellingFix;
+
+async function applyAllSpellingFixes(tid){
+  const r = sleeperUI.results.find(x=>x.tid===tid);
+  if(!r || !r.spellingFixes.length) return;
+  await Promise.all(r.spellingFixes.map(f=>
+    update(ref(db, `${ROOT}/rosters/${f.tid}/${f.pid}`), {name:f.to})
+  ));
+  toast(`Fixed ${r.spellingFixes.length} name${r.spellingFixes.length===1?'':'s'} for ${OWNERS[tid]}`);
+  r.spellingFixes = [];
+  renderApp();
+}
+window.applyAllSpellingFixes = applyAllSpellingFixes;
+
 function renderSleeperResults(){
   const cards = sleeperUI.results.map(r=>{
-    const clean = r.missingFromApp.length===0 && r.extraInApp.length===0;
+    const clean = r.trueMissing.length===0 && r.trueExtra.length===0 && r.spellingFixes.length===0;
+    const fixRows = r.spellingFixes.map(f=>
+      `<div style="display:flex;align-items:center;gap:10px;margin-top:6px;font-size:13px;">
+        <span style="color:var(--muted);text-decoration:line-through;">${f.from}</span>
+        <span style="color:var(--gold-bright);">→ ${f.to}</span>
+        <button class="btn small turf" style="padding:4px 10px;font-size:11px;" onclick="applySpellingFix('${f.tid}','${f.pid}','${f.to.replace(/'/g,"\\'")}')">Fix</button>
+      </div>`
+    ).join("");
     return `<div class="card" style="margin-bottom:12px;border-color:${clean?'var(--turf)':'var(--alert)'};">
       <div class="eyebrow-label">${OWNERS[r.tid]} ${clean? '<span style="color:var(--turf-bright);">— matches Sleeper</span>' : ''}</div>
-      ${r.missingFromApp.length? `<div style="font-size:13px;margin-top:6px;"><b style="color:var(--gold-bright);">On Sleeper, not in this app:</b> ${r.missingFromApp.join(', ')}</div>`:''}
-      ${r.extraInApp.length? `<div style="font-size:13px;margin-top:6px;"><b style="color:var(--alert-bright);">In this app, not on Sleeper:</b> ${r.extraInApp.join(', ')}</div>`:''}
+      ${r.spellingFixes.length? `<div style="margin-top:8px;"><b style="font-size:13px;color:var(--gold-bright);">Likely spelling mismatches (Sleeper's spelling used as correct):</b>
+        ${fixRows}
+        ${r.spellingFixes.length>1? `<button class="btn small ghost" style="margin-top:8px;" onclick="applyAllSpellingFixes('${r.tid}')">Fix All ${r.spellingFixes.length}</button>`:''}
+      </div>`:''}
+      ${r.trueMissing.length? `<div style="font-size:13px;margin-top:10px;"><b style="color:var(--gold-bright);">On Sleeper, not in this app:</b> ${r.trueMissing.join(', ')}</div>`:''}
+      ${r.trueExtra.length? `<div style="font-size:13px;margin-top:6px;"><b style="color:var(--alert-bright);">In this app, not on Sleeper:</b> ${r.trueExtra.join(', ')}</div>`:''}
     </div>`;
   }).join("");
   return `<div style="margin-bottom:14px;"><button class="btn small ghost" onclick="runSleeperCheck()">Re-run Check</button></div>${cards}`;
