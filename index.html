@@ -542,6 +542,7 @@ const mirror = {
   fa: { activePlayerId:null, meta:{}, status:{}, customPlayers:{} },  // all PUBLIC
   rosters: {},          // teamId -> { pid -> {name,pos,nflTeam,acq,contractYears,salary,yearsRemaining,status,franchiseTagsUsed,extensionsUsed} }
   sleeperMapping: {},    // sleeperRosterId -> our team key
+  autoCheck: null,       // {lastRun, mismatchCount, fillCount} — shared, powers the dashboard banner
   ready:false
 };
 // Private $ amounts, fetched/cached on demand since Firebase rules won't
@@ -667,7 +668,14 @@ function startListeners(){
     renderAll();
   });
   onValue(ref(db, `${ROOT}/rosters`), snap=>{ mirror.rosters = snap.val() || {}; renderAll(); });
-  onValue(ref(db, `${ROOT}/sleeperMapping`), snap=>{ mirror.sleeperMapping = snap.val() || {}; renderAll(); });
+  onValue(ref(db, `${ROOT}/sleeperMapping`), snap=>{
+    mirror.sleeperMapping = snap.val() || {};
+    renderAll();
+    // fire-and-forget: silently checks Sleeper for drift if it's been ≥7
+    // days since the last check, so nobody has to remember to run it
+    if(myTeam) maybeRunAutoCheck().catch(()=>{});
+  });
+  onValue(ref(db, `${ROOT}/autoCheck`), snap=>{ mirror.autoCheck = snap.val() || null; renderAll(); });
   // rfa/fa: only PUBLIC data (activePlayerId, meta, status) is broadly
   // listened to. Actual $ amounts live under /rfa/private and /fa/private
   // and are fetched narrowly via ensurePrivate() — see above.
@@ -735,8 +743,22 @@ function viewDashboard(){
     </div>`;
   }).join("");
 
+  let autoCheckBanner = '';
+  if(mirror.autoCheck){
+    const daysAgo = Math.floor((Date.now()-mirror.autoCheck.lastRun)/(24*3600*1000));
+    const totalFindings = (mirror.autoCheck.mismatchCount||0) + (mirror.autoCheck.fillCount||0);
+    autoCheckBanner = `<div class="card" style="margin-bottom:22px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+      <div>
+        <div class="eyebrow-label" style="margin-bottom:4px;">Sleeper Auto-Check</div>
+        <div style="font-size:13px;color:var(--muted);">Last checked ${daysAgo===0?'today':daysAgo===1?'yesterday':daysAgo+' days ago'} — ${totalFindings===0? 'everything matched, nothing to review.' : `${mirror.autoCheck.mismatchCount} roster discrepanc${mirror.autoCheck.mismatchCount===1?'y':'ies'}, ${mirror.autoCheck.fillCount} NFL team${mirror.autoCheck.fillCount===1?'':'s'} to fill in.`}</div>
+      </div>
+      ${totalFindings>0? `<button class="btn small turf" onclick="setPhase('sleeper')">Review in Sleeper Sync</button>` : ''}
+    </div>`;
+  }
+
   return `
   <div class="section-head"><div><h2>Front Office</h2><div class="desc">Live-synced across all 8 owners. This offseason's draft and free agency are wrapped — roster management is the focus now.</div></div></div>
+  ${autoCheckBanner}
   <div class="grid-2" style="margin-bottom:26px;">
     <div class="plaque"><div class="bc2"></div><div class="bc3"></div>
       <div class="eyebrow-label">Roster Management</div>
@@ -1228,6 +1250,26 @@ function nameSimilarity(a, b){
 }
 const FUZZY_MATCH_THRESHOLD = 0.72;
 
+let autoCheckInFlight = false;
+async function maybeRunAutoCheck(){
+  if(autoCheckInFlight) return;
+  if(!mirror.sleeperMapping || Object.keys(mirror.sleeperMapping).length < Object.keys(OWNERS).length) return; // mapping not fully set up yet
+  const WEEK_MS = 7*24*3600*1000;
+  let snap;
+  try{ snap = await get(ref(db, `${ROOT}/autoCheck/lastRun`)); }catch(e){ return; }
+  const last = snap.exists() ? snap.val() : 0;
+  if(Date.now() - last < WEEK_MS) return; // already checked recently, nothing to do
+  autoCheckInFlight = true;
+  try{
+    if(!sleeperUI.rosters) await loadSleeperLeagueData();
+    await runSleeperCheck();
+    await runNflTeamFill();
+    // both calls above already sync the summary via syncAutoCheckSummary()
+  }catch(e){ /* silent — this is a background convenience check, not critical path */ }
+  autoCheckInFlight = false;
+}
+window.maybeRunAutoCheck = maybeRunAutoCheck;
+
 async function runSleeperCheck(){
   sleeperUI.loading = true; renderApp();
   try{
@@ -1275,6 +1317,7 @@ async function runSleeperCheck(){
       return {tid, trueMissing, trueExtra, spellingFixes};
     });
     sleeperUI.results = results;
+    syncAutoCheckSummary();
   }catch(e){
     toast("Check failed: "+e.message);
   }
@@ -1282,6 +1325,12 @@ async function runSleeperCheck(){
   renderApp();
 }
 window.runSleeperCheck = runSleeperCheck;
+
+function syncAutoCheckSummary(){
+  const mismatchCount = (sleeperUI.results||[]).reduce((s,r)=> s+r.trueMissing.length+r.trueExtra.length+r.spellingFixes.length, 0);
+  const fillCount = (sleeperUI.nflFillResults||[]).length;
+  set(ref(db, `${ROOT}/autoCheck`), {lastRun: Date.now(), mismatchCount, fillCount}).catch(()=>{});
+}
 
 async function applySpellingFix(tid, pid, newName){
   await update(ref(db, `${ROOT}/rosters/${tid}/${pid}`), {name:newName});
@@ -1357,6 +1406,7 @@ async function runNflTeamFill(){
       });
     });
     sleeperUI.nflFillResults = suggestions;
+    syncAutoCheckSummary();
   }catch(e){
     toast("Lookup failed: "+e.message);
   }
