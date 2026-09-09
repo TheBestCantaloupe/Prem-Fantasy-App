@@ -16,6 +16,10 @@
           ".read": "auth != null",
           ".write": "auth != null"
         },
+        "autoCheck": {
+          ".read": "auth != null",
+          ".write": "auth != null"
+        },
         "rfa": {
           "activePlayerId": { ".read": "auth != null", ".write": "auth != null" },
           "meta": {
