@@ -543,6 +543,7 @@ const mirror = {
   rosters: {},          // teamId -> { pid -> {name,pos,nflTeam,acq,contractYears,salary,yearsRemaining,status,franchiseTagsUsed,extensionsUsed} }
   sleeperMapping: {},    // sleeperRosterId -> our team key
   autoCheck: null,       // {lastRun, mismatchCount, fillCount} — shared, powers the dashboard banner
+  leagueSettings: { offseason: false },  // gates Extend/Tag to offseason-only
   ready:false
 };
 // Private $ amounts, fetched/cached on demand since Firebase rules won't
@@ -676,6 +677,7 @@ function startListeners(){
     if(myTeam) maybeRunAutoCheck().catch(()=>{});
   });
   onValue(ref(db, `${ROOT}/autoCheck`), snap=>{ mirror.autoCheck = snap.val() || null; renderAll(); });
+  onValue(ref(db, `${ROOT}/leagueSettings`), snap=>{ mirror.leagueSettings = snap.val() || {offseason:false}; renderAll(); });
   // rfa/fa: only PUBLIC data (activePlayerId, meta, status) is broadly
   // listened to. Actual $ amounts live under /rfa/private and /fa/private
   // and are fetched narrowly via ensurePrivate() — see above.
@@ -697,7 +699,7 @@ window.setPhase = setPhase;
 
 function renderShell(){
   const nav = document.getElementById('nav');
-  const tabs = [["dashboard","Dashboard"],["rosters","Rosters"],["freeagents","Free Agents"],["standings","Standings"],["sleeper","Sleeper Sync"],["rfa","RFA Round"],["fa","FA Auction"],["summary","Summary"]];
+  const tabs = [["dashboard","Dashboard"],["standings","Standings"],["rosters","Rosters"],["freeagents","Free Agents"],["sleeper","Sleeper Sync"],["rfa","RFA Round"],["fa","FA Auction"],["summary","Summary"]];
   nav.innerHTML = tabs.map(([id,label])=>`<button class="${phase===id?'active':''}" onclick="setPhase('${id}')">${label}</button>`).join("");
 
   const ticker = document.getElementById('ticker');
@@ -758,8 +760,22 @@ function viewDashboard(){
     </div>`;
   }
 
+  const mapped = mirror.sleeperMapping && Object.keys(mirror.sleeperMapping).length>0;
+  let standingsBlock;
+  if(!mapped){
+    standingsBlock = `<div class="card empty" style="margin-bottom:26px;"><div class="display">Standings Not Set Up Yet</div>Finish the one-time Sleeper team mapping to show live standings here.<div style="margin-top:14px;"><button class="btn turf" onclick="setPhase('sleeper')">Go to Sleeper Sync</button></div></div>`;
+  } else {
+    if(!sleeperUI.rosters && !sleeperUI.loading){ loadSleeperLeagueData(); }
+    standingsBlock = sleeperUI.rosters
+      ? `<div style="margin-bottom:26px;">${viewStandingsTable()}</div>`
+      : `<div class="card empty" style="margin-bottom:26px;"><div class="display">Loading Standings…</div></div>`;
+  }
+
   return `
-  <div class="section-head"><div><h2>Front Office</h2><div class="desc">Live-synced across all 8 owners. This offseason's draft and free agency are wrapped — roster management is the focus now.</div></div></div>
+  <div class="section-head"><div><h2>Front Office</h2><div class="desc">Live-synced across all 8 owners.</div></div>
+    <button class="btn ghost small" onclick="setPhase('standings')">Full Standings &amp; Schedule</button>
+  </div>
+  ${standingsBlock}
   ${autoCheckBanner}
   <div class="grid-2" style="margin-bottom:26px;">
     <div class="plaque"><div class="bc2"></div><div class="bc3"></div>
@@ -822,6 +838,7 @@ function viewRosters(){
   const under50 = totalYears < 50;
   const overRoster = roster.length > 26;
   const fch = team.futureCapHits || {plus1:0,plus2:0,plus3plus:0};
+  const offseasonMode = !!(mirror.leagueSettings && mirror.leagueSettings.offseason);
 
   const teamTabs = Object.keys(OWNERS).map(tid=>
     `<button class="btn small ${tid===vt?'':'ghost'}" style="margin:0 6px 6px 0;" onclick="switchRosterTeam('${tid}')">${OWNERS[tid]}${tid===myTeam?' (you)':''}</button>`
@@ -829,8 +846,8 @@ function viewRosters(){
 
   const rows = roster.map(p=>{
     const finalYear = p.yearsRemaining<=1;
-    const canExtend = isMine && finalYear && p.acq!=='ROOKIE' && !team.usedExtensionThisSeason;
-    const canTag = isMine && finalYear && !team.usedFranchiseTagThisSeason && (p.franchiseTagsUsed||0)<2;
+    const canExtend = isMine && offseasonMode && finalYear && p.acq!=='ROOKIE' && !team.usedExtensionThisSeason;
+    const canTag = isMine && offseasonMode && finalYear && !team.usedFranchiseTagThisSeason && (p.franchiseTagsUsed||0)<2;
     const acting = rosterUI.actionPid===p.id;
     let actionRow = '';
     if(isMine){
@@ -928,6 +945,10 @@ function viewRosters(){
   <div class="section-head">
     <div><h2>Rosters</h2><div class="desc">Every field is directly editable. Cuts, extensions, and tags still apply league math automatically if you'd rather use those.</div></div>
     <button class="btn ghost small" onclick="resyncLeagueData()">Resync Latest League Data</button>
+  </div>
+  <div class="discount-note" style="margin-bottom:14px;">
+    Season status: <b style="color:${offseasonMode?'var(--gold-bright)':'var(--alert-bright)'};">${offseasonMode?'OFFSEASON — Extend & Tag available':'IN SEASON — Extend & Tag locked'}</b>
+    &nbsp;·&nbsp; <a style="cursor:pointer;text-decoration:underline;" onclick="setSeasonMode(${!offseasonMode})">Switch to ${offseasonMode?'in-season':'offseason'}</a>
   </div>
   <div style="margin-bottom:14px;">${teamTabs}</div>
   <div class="grid-3" style="margin-bottom:22px;">
@@ -1040,6 +1061,7 @@ async function confirmCut(pid){
   closeRosterAction();
 }
 async function confirmExtend(pid){
+  if(!(mirror.leagueSettings && mirror.leagueSettings.offseason)){ toast("Extensions are only available during the offseason"); closeRosterAction(); return; }
   const tid = myTeam;
   const p = teamRoster(tid)[pid];
   const newSal = computeExtension(p.salary);
@@ -1054,6 +1076,7 @@ async function confirmExtend(pid){
   closeRosterAction();
 }
 async function confirmTag(pid){
+  if(!(mirror.leagueSettings && mirror.leagueSettings.offseason)){ toast("Franchise tags are only available during the offseason"); closeRosterAction(); return; }
   const tid = myTeam;
   const p = teamRoster(tid)[pid];
   const tagSal = computeTag(pid, p.pos, p.salary);
@@ -1068,6 +1091,11 @@ async function confirmTag(pid){
   closeRosterAction();
 }
 window.confirmCut=confirmCut; window.confirmExtend=confirmExtend; window.confirmTag=confirmTag;
+async function setSeasonMode(offseason){
+  await set(ref(db, `${ROOT}/leagueSettings/offseason`), offseason);
+  toast(offseason ? "Marked as offseason — Extend & Tag are available" : "Marked as in-season — Extend & Tag are locked");
+}
+window.setSeasonMode = setSeasonMode;
 
 async function resyncLeagueData(){
   if(!confirm("This overwrites every team's roster and current-season cap with the latest data from the spreadsheet. Any cuts/extensions/tags done in-app since the last import will be replaced. Continue?")) return;
