@@ -1591,47 +1591,55 @@ async function runSleeperCheck(){
   sleeperUI.loading = true; renderApp();
   try{
     const players = await loadSleeperPlayers();
-    const byRoster = {}; // ourTeamKey -> [sleeper names]
-    sleeperUI.rosters.forEach(r=>{
-      const tid = mirror.sleeperMapping[r.roster_id];
-      if(!tid) return;
-      byRoster[tid] = (r.players||[]).map(pid=>{
-        const p = players[pid];
-        return p ? `${p.first_name} ${p.last_name}` : null;
-      }).filter(Boolean);
-    });
 
     const results = Object.keys(OWNERS).map(tid=>{
-      const sleeperNames = byRoster[tid] || [];
-      const sleeperNorm = sleeperNames.map(normName);
+      const r = sleeperUI.rosters.find(x=>mirror.sleeperMapping[x.roster_id]===tid);
+      const sleeperIds = (r && r.players) || [];
+      const taxiIds = new Set((r && r.taxi) || []);
+      const reserveIds = new Set((r && r.reserve) || []);
+      const sleeperEntries = sleeperIds.map(pid=>{
+        const p = players[pid];
+        if(!p) return null;
+        const status = taxiIds.has(pid) ? 'taxi' : reserveIds.has(pid) ? 'ir' : 'active';
+        return {name:`${p.first_name} ${p.last_name}`, status};
+      }).filter(Boolean);
+
       const ourPlayers = activePlayers(tid);
-      const ourNorm = ourPlayers.map(p=>normName(p.name));
-
-      const missingNames = sleeperNames.filter((n,i)=> !ourNorm.includes(sleeperNorm[i]));
-      const extraPlayers = ourPlayers.filter(p=> !sleeperNorm.includes(normName(p.name)));
-
-      // fuzzy-pair each missing Sleeper name against each unmatched app player;
-      // anything above threshold is almost certainly the same person misspelled
-      const usedExtra = new Set();
+      const usedSleeper = new Set();
       const spellingFixes = [];
-      const trueMissing = [];
-      missingNames.forEach(sName=>{
-        let best = null, bestScore = 0;
-        extraPlayers.forEach(ep=>{
-          if(usedExtra.has(ep.id)) return;
-          const score = nameSimilarity(sName, ep.name);
-          if(score > bestScore){ bestScore = score; best = ep; }
-        });
-        if(best && bestScore >= FUZZY_MATCH_THRESHOLD){
-          usedExtra.add(best.id);
-          spellingFixes.push({tid, pid:best.id, from:best.name, to:sName});
+      const statusFixes = [];
+      const trueExtra = [];
+
+      ourPlayers.forEach(op=>{
+        const opNorm = normName(op.name);
+        // exact match first
+        let match = sleeperEntries.find((se,i)=>!usedSleeper.has(i) && normName(se.name)===opNorm);
+        let matchIdx = match ? sleeperEntries.indexOf(match) : -1;
+        if(!match){
+          // fall back to fuzzy match — likely a spelling difference
+          let bestScore=0, bestIdx=-1;
+          sleeperEntries.forEach((se,i)=>{
+            if(usedSleeper.has(i)) return;
+            const score = nameSimilarity(op.name, se.name);
+            if(score>bestScore){ bestScore=score; bestIdx=i; }
+          });
+          if(bestIdx>=0 && bestScore>=FUZZY_MATCH_THRESHOLD){
+            match = sleeperEntries[bestIdx]; matchIdx = bestIdx;
+            spellingFixes.push({tid, pid:op.id, from:op.name, to:match.name});
+          }
+        }
+        if(match){
+          usedSleeper.add(matchIdx);
+          if(op.status!=='cut' && op.status!==match.status){
+            statusFixes.push({tid, pid:op.id, name:op.name, from:op.status, to:match.status});
+          }
         } else {
-          trueMissing.push(sName);
+          trueExtra.push({tid, pid:op.id, name:op.name});
         }
       });
-      const trueExtra = extraPlayers.filter(ep=>!usedExtra.has(ep.id)).map(p=>p.name);
+      const trueMissing = sleeperEntries.filter((se,i)=>!usedSleeper.has(i)).map(se=>se.name);
 
-      return {tid, trueMissing, trueExtra, spellingFixes};
+      return {tid, trueMissing, trueExtra, spellingFixes, statusFixes};
     });
     sleeperUI.results = results;
     syncAutoCheckSummary();
@@ -1644,14 +1652,13 @@ async function runSleeperCheck(){
 window.runSleeperCheck = runSleeperCheck;
 
 function syncAutoCheckSummary(){
-  const mismatchCount = (sleeperUI.results||[]).reduce((s,r)=> s+r.trueMissing.length+r.trueExtra.length+r.spellingFixes.length, 0);
+  const mismatchCount = (sleeperUI.results||[]).reduce((s,r)=> s+r.trueMissing.length+r.trueExtra.length+r.spellingFixes.length+r.statusFixes.length, 0);
   const fillCount = (sleeperUI.nflFillResults||[]).length;
   set(ref(db, `${ROOT}/autoCheck`), {lastRun: Date.now(), mismatchCount, fillCount}).catch(()=>{});
 }
 
 async function applySpellingFix(tid, pid, newName){
   await update(ref(db, `${ROOT}/rosters/${tid}/${pid}`), {name:newName});
-  // remove this fix from the pending list so the UI updates immediately
   const r = sleeperUI.results.find(x=>x.tid===tid);
   if(r) r.spellingFixes = r.spellingFixes.filter(f=>f.pid!==pid);
   toast(`Renamed to ${newName}`);
@@ -1671,9 +1678,67 @@ async function applyAllSpellingFixes(tid){
 }
 window.applyAllSpellingFixes = applyAllSpellingFixes;
 
+async function applyStatusFix(tid, pid, newStatus){
+  await update(ref(db, `${ROOT}/rosters/${tid}/${pid}`), {status:newStatus});
+  const r = sleeperUI.results.find(x=>x.tid===tid);
+  if(r) r.statusFixes = r.statusFixes.filter(f=>f.pid!==pid);
+  toast(`Status updated to ${newStatus}`);
+  renderApp();
+}
+window.applyStatusFix = applyStatusFix;
+
+async function applyAllStatusFixes(tid){
+  const r = sleeperUI.results.find(x=>x.tid===tid);
+  if(!r || !r.statusFixes.length) return;
+  await Promise.all(r.statusFixes.map(f=>
+    update(ref(db, `${ROOT}/rosters/${f.tid}/${f.pid}`), {status:f.to})
+  ));
+  toast(`Updated ${r.statusFixes.length} status${r.statusFixes.length===1?'':'es'} for ${OWNERS[tid]}`);
+  r.statusFixes = [];
+  renderApp();
+}
+window.applyAllStatusFixes = applyAllStatusFixes;
+
+// "Cut" applies the real dead-cap math (frees this year's salary, charges
+// future seasons per the 50/35/25 rule) — for a player who was actually
+// released. "Remove" just deletes the record with no cap consequence — for
+// a player who left via trade or was never a real signing to begin with.
+async function departedCutPlayer(tid, pid){
+  const p = teamRoster(tid)[pid];
+  if(!p) return;
+  const dc = computeDeadCap(p.salary, p.yearsRemaining);
+  const teamSnap = await get(ref(db, `${ROOT}/teams/${tid}`));
+  const team = teamSnap.val();
+  const fch = team.futureCapHits || {plus1:0,plus2:0,plus3plus:0};
+  await update(ref(db, `${ROOT}/rosters/${tid}/${pid}`), {status:'cut', yearsRemaining:0});
+  await runTransaction(ref(db, `${ROOT}/teams/${tid}/cap`), cur => (cur==null?team.cap:cur) + p.salary);
+  await update(ref(db, `${ROOT}/teams/${tid}/futureCapHits`), {
+    plus1: Math.round((fch.plus1+dc.plus1)*100)/100,
+    plus2: Math.round((fch.plus2+dc.plus2)*100)/100,
+    plus3plus: Math.round((fch.plus3plus+dc.plus3plus)*100)/100
+  });
+  const r = sleeperUI.results.find(x=>x.tid===tid);
+  if(r) r.trueExtra = r.trueExtra.filter(f=>f.pid!==pid);
+  toast(`${p.name} cut — ${money(dc.total)} dead cap on the books`);
+  renderApp();
+}
+window.departedCutPlayer = departedCutPlayer;
+
+async function departedRemovePlayer(tid, pid){
+  const p = teamRoster(tid)[pid];
+  if(!p) return;
+  if(!confirm(`Remove ${p.name} with no cap penalty? Use this only if they left via trade or were never a real signing — not for a straight release.`)) return;
+  await set(ref(db, `${ROOT}/rosters/${tid}/${pid}`), null);
+  const r = sleeperUI.results.find(x=>x.tid===tid);
+  if(r) r.trueExtra = r.trueExtra.filter(f=>f.pid!==pid);
+  toast(`${p.name} removed, no cap penalty`);
+  renderApp();
+}
+window.departedRemovePlayer = departedRemovePlayer;
+
 function renderSleeperResults(){
   const cards = sleeperUI.results.map(r=>{
-    const clean = r.trueMissing.length===0 && r.trueExtra.length===0 && r.spellingFixes.length===0;
+    const clean = r.trueMissing.length===0 && r.trueExtra.length===0 && r.spellingFixes.length===0 && r.statusFixes.length===0;
     const fixRows = r.spellingFixes.map(f=>
       `<div style="display:flex;align-items:center;gap:10px;margin-top:6px;font-size:13px;">
         <span style="color:var(--muted);text-decoration:line-through;">${f.from}</span>
@@ -1681,14 +1746,34 @@ function renderSleeperResults(){
         <button class="btn small turf" style="padding:4px 10px;font-size:11px;" onclick="applySpellingFix('${f.tid}','${f.pid}','${f.to.replace(/'/g,"\\'")}')">Fix</button>
       </div>`
     ).join("");
+    const statusRows = r.statusFixes.map(f=>
+      `<div style="display:flex;align-items:center;gap:10px;margin-top:6px;font-size:13px;">
+        <span>${f.name}</span>
+        <span style="color:var(--muted);">${f.from}</span> <span style="color:var(--gold-bright);">→ ${f.to}</span>
+        <button class="btn small turf" style="padding:4px 10px;font-size:11px;" onclick="applyStatusFix('${f.tid}','${f.pid}','${f.to}')">Fix</button>
+      </div>`
+    ).join("");
+    const extraRows = r.trueExtra.map(f=>
+      `<div style="display:flex;align-items:center;gap:10px;margin-top:6px;font-size:13px;flex-wrap:wrap;">
+        <span>${f.name}</span>
+        <button class="btn small alert" style="padding:4px 10px;font-size:11px;" onclick="departedCutPlayer('${f.tid}','${f.pid}')">Cut (dead cap)</button>
+        <button class="btn small ghost" style="padding:4px 10px;font-size:11px;" onclick="departedRemovePlayer('${f.tid}','${f.pid}')">Remove (no penalty)</button>
+      </div>`
+    ).join("");
     return `<div class="card" style="margin-bottom:12px;border-color:${clean?'var(--turf)':'var(--alert)'};">
       <div class="eyebrow-label">${OWNERS[r.tid]} ${clean? '<span style="color:var(--turf-bright);">— matches Sleeper</span>' : ''}</div>
-      ${r.spellingFixes.length? `<div style="margin-top:8px;"><b style="font-size:13px;color:var(--gold-bright);">Likely spelling mismatches (Sleeper's spelling used as correct):</b>
+      ${r.spellingFixes.length? `<div style="margin-top:8px;"><b style="font-size:13px;color:var(--gold-bright);">Likely spelling mismatches:</b>
         ${fixRows}
         ${r.spellingFixes.length>1? `<button class="btn small ghost" style="margin-top:8px;" onclick="applyAllSpellingFixes('${r.tid}')">Fix All ${r.spellingFixes.length}</button>`:''}
       </div>`:''}
+      ${r.statusFixes.length? `<div style="margin-top:10px;"><b style="font-size:13px;color:var(--gold-bright);">Taxi/IR status doesn't match Sleeper:</b>
+        ${statusRows}
+        ${r.statusFixes.length>1? `<button class="btn small ghost" style="margin-top:8px;" onclick="applyAllStatusFixes('${r.tid}')">Fix All ${r.statusFixes.length}</button>`:''}
+      </div>`:''}
+      ${r.trueExtra.length? `<div style="margin-top:10px;"><b style="font-size:13px;color:var(--alert-bright);">In this app, not on Sleeper — no longer on the real roster:</b>
+        ${extraRows}
+      </div>`:''}
       ${r.trueMissing.length? `<div style="font-size:13px;margin-top:10px;"><b style="color:var(--gold-bright);">On Sleeper, not in this app:</b> ${r.trueMissing.join(', ')}</div>`:''}
-      ${r.trueExtra.length? `<div style="font-size:13px;margin-top:6px;"><b style="color:var(--alert-bright);">In this app, not on Sleeper:</b> ${r.trueExtra.join(', ')}</div>`:''}
     </div>`;
   }).join("");
   return `<div style="margin-bottom:14px;"><button class="btn small ghost" onclick="runSleeperCheck()">Re-run Check</button></div>${cards}`;
