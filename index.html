@@ -309,13 +309,179 @@ const FA_RAW = [
 ];
 const faPlayersStatic = FA_RAW.map((r,i)=>({id:"fa"+i, lastOwner:r[0], name:r[1], pos:r[2], origCost:r[3]}));
 
+const ROSTER_RAW = [
+["JIMMY","RJ Harvey","DEN","ROOKIE","RB",3,10.0,3,"active"],
+["FINCHER","Josh Jacobs","GB","FA","RB",4,38.0,3,"active"],
+["PAUL","Breece Hall","NYJ","FA","RB",3,28.0,2,"active"],
+["FINCHER","Justin Fields","PIT","FA","QB",4,2.0,2,"active"],
+["JOSH","Antonio Williams","","ROOKIE","WR",3,10.0,3,"active"],
+["COLLIN","Jerome Ford","CLE","FA","RB",4,3.0,2,"active"],
+["IAN","Kaytron Allen","","ROOKIE","RB",3,2.0,3,"active"],
+["JIMMY","T.J. Hockenson","MIN","FA","TE",3,6.0,1,"active"],
+["PAUL","Kenneth Walker","SEA","FA","RB",3,25.0,2,"active"],
+["IAN","Spencer Rattler","NOS","ROOKIE","QB",3,1.0,1,"active"],
+["JIMMY","Emmett Johnson","","ROOKIE","RB",3,2.0,3,"active"],
+["JOSH","Demond Claiborne","","ROOKIE","RB",3,1.0,3,"active"],
+["COLLIN","Jordyn Tyson","","ROOKIE","WR",3,12.0,3,"active"],
+["BUB","Chigoziem Okonkwo","TEN","FA","TE",4,1.0,2,"active"],
+["JOSH","Calvin Ridley","TEN","FA","WR",3,7.0,2,"active"],
+["FINCHER","Malik Nabers","NYG","ROOKIE","WR",3,12.0,1,"active"],
+["PAUL","David Montgomery","DET","FA","RB",2,20.0,1,"active"],
+["RYAN","Puka Nacua","LAR","FA","WR",3,25.0,1,"active"],
+["JIMMY","Kyle Williams","NE","ROOKIE","WR",3,1.0,3,"active"],
+["JOSH","Jayden Reed","GB","FA","WR",4,7.0,2,"active"],
+["FINCHER","James Cook","BUF","FA","RB",4,25.0,3,"active"],
+["FINCHER","Mason Taylor","NYJ","ROOKIE","TE",3,2.0,2,"active"],
+["JOSH","Deion Burks","","ROOKIE","WR",3,1.0,3,"active"],
+["IAN","Aaron Rodgers","NYJ","FA","QB",4,7.0,1,"active"],
+["RYAN","Jason Myers","SEA","FA","PK",4,1.0,1,"active"],
+["FINCHER","Jaydon Blue","DAL","ROOKIE","RB",3,3.0,2,"active"],
+["PAUL","Xavier Worthy","KCC","ROOKIE","WR",3,10.0,1,"active"],
+["COLLIN","Tank Dell","HOU","FA","WR",4,10.0,2,"active"],
+["IAN","Braelon Allen","NYJ","FA","RB",2,7.0,1,"active"],
+["IAN","Terrance Ferguson","LAR","ROOKIE","TE",3,1.0,2,"active"],
+["IAN","LADD McCONKEY","","ROOKIE","WR",3,7.0,1,"taxi"],
+["BUB","Tyler Warren","IND","ROOKIE","TE",3,10.0,2,"active"],
+["JOSH","Jaylen Wright","MIA","ROOKIE","RB",3,3.0,1,"active"],
+["COLLIN","Blake Corum","LAR","ROOKIE","RB",3,2.0,1,"active"],
+["IAN","Colston Loveland","CHI","ROOKIE","TE",3,3.0,3,"active"],
+["IAN","JA'Kobi Lane","","ROOKIE","WR",3,1.0,3,"active"],
+["RYAN","Kaleb Johnson","PIT","ROOKIE","RB",3,7.0,2,"active"],
+["RYAN","Jaylen Warren","PIT","FA","RB",4,1.0,1,"active"],
+["COLLIN","Isaiah Pacheco","KC","FA","RB",2,20.0,1,"active"],
+["RYAN","Mike Evans","TB","FA","WR",2,20.0,1,"active"],
+["BUB","Malik Washington","MIA","FA","WR",1,1.0,1,"active"],
+["RYAN","Roman Wilson","","ROOKIE","WR",3,1.0,1,"taxi"],
+["BUB","Caleb Williams","CHI","ROOKIE","QB",3,15.0,1,"active"],
+["PAUL","Jared Goff","DET","FA","QB",3,8.0,3,"active"],
+["JOSH","Dak Prescott","DAL","FA","QB",2,16.0,1,"active"],
+["BUB","Adonai Mitchell","IND","ROOKIE","WR",3,2.0,1,"active"],
+["JOSH","DeVonta Smith","PHI","FA","WR",3,16.0,2,"active"],
+["RYAN","Marvin Harrison JR.","ARI","ROOKIE","WR",3,16.0,1,"active"],
+["FINCHER","Brian Thomas","JAX","ROOKIE","WR",3,5.0,1,"active"],
+["JOSH","Kyle Pitts","ATL","FA","TE",3,15.0,1,"active"],
+["COLLIN","Tyler Algeier","","FA","RB",2,20.0,1,"active"],
+["JIMMY","A.J Brown","PHI","FA","WR",2,27.0,1,"active"],
+["JIMMY","Marshawn Lloyd","GBP","ROOKIE","RB",3,1.0,1,"active"],
+["RYAN","Jonah Coleman","","ROOKIE","RB",3,7.0,3,"active"],
+["FINCHER","Jake Bates","DET","FA","PK",4,1.0,3,"active"],
+["COLLIN","TY Simpson","","ROOKIE","QB",3,2.0,3,"active"],
+["JIMMY","Skyler Bell","","ROOKIE","WR",3,1.0,3,"active"],
+["RYAN","Brock Bowers","LV","ROOKIE","TE",3,13.0,1,"active"],
+["BUB","Omarion Hampton","LAC","ROOKIE","RB",3,14.0,2,"active"],
+["COLLIN","Ashton Jentry","LVR","ROOKIE","RB",3,16.0,2,"active"],
+["RYAN","Cam Skattebo","NYG","ROOKIE","RB",3,4.0,2,"active"],
+["FINCHER","Chris Godwin","TB","FA","WR",4,10.0,3,"active"],
+["FINCHER","Michael Penix JR.","ATL","ROOKIE","QB",3,2.0,1,"active"],
+["PAUL","Denzel Boston","","ROOKIE","WR",3,8.0,3,"active"],
+["PAUL","Chris Olave","NOS","FA","WR",3,7.0,2,"active"],
+["COLLIN","Makai Lemon","","ROOKIE","WR",3,10.0,3,"active"],
+["IAN","Harrison Butker","KC","FA","PK",4,2.0,1,"active"],
+["RYAN","Brandon Aubrey","DAL","FA","PK",3,2.0,1,"active"],
+["BUB","Jeremiyah Love","","ROOKIE","RB",3,14.0,3,"active"],
+["COLLIN","Jaylen Waddle","MIA","FA","WR",4,16.0,2,"active"],
+["COLLIN","Emeka Egbuka","TB","ROOKIE","WR",3,8.0,2,"active"],
+["COLLIN","Chris Bell","","ROOKIE","WR",3,2.0,3,"active"],
+["FINCHER","Christian Kirk","HOU","FA","WR",4,1.0,3,"active"],
+["PAUL","Tony Pollard","TEN","FA","RB",3,6.0,3,"active"],
+["PAUL","Tyler Shough","NOS","ROOKIE","QB",3,6.0,2,"active"],
+["PAUL","Jameson Williams","DET","FA","WR",3,4.0,2,"active"],
+["IAN","Ceedee Lamb","","DRAFT","WR",6,27.0,1,"active"],
+["RYAN","TETAIROA McMILLAN","CAR","ROOKIE","WR",3,13.0,3,"active"],
+["PAUL","Rachaad White","TB","FA","RB",3,4.0,2,"active"],
+["PAUL","BO Nix","DEN","ROOKIE","QB",3,3.0,1,"active"],
+["JOSH","Justin Jefferson","#REF!","FRANCHISE TAG 1","WR",1,32.0,1,"active"],
+["COLLIN","TREY McBRIDE","ARI","RFA","TE",2,14.0,1,"active"],
+["JIMMY","Alvin Kamara","NO","FA","RB",2,21.0,1,"active"],
+["JIMMY","Matthew Golden","GBP","ROOKIE","WR",3,5.0,3,"active"],
+["FINCHER","Courtland Sutton","DEN","FA","WR",4,2.0,2,"active"],
+["PAUL","Eli Stowers","","ROOKIE","TE",3,3.0,3,"active"],
+["JIMMY","Jordan Love","#REF!","FA","QB",4,4.0,1,"active"],
+["RYAN","Jaxson Dart","NYG","ROOKIE","QB",3,2.0,2,"active"],
+["FINCHER","Jakobi Meyers","LV","FA","WR",4,1.0,2,"active"],
+["FINCHER","Jermaine Burton","CIN","ROOKIE","WR",3,1.0,1,"active"],
+["FINCHER","Najee Harris","PIT","FA","RB",4,10.0,2,"active"],
+["BUB","Jaylin Noel","HOU","ROOKIE","WR",3,1.0,2,"active"],
+["COLLIN","Jake Elliott","PHI","FA","PK",4,1.0,2,"active"],
+["COLLIN","Jalen Milroe","SEA","ROOKIE","QB",3,1.0,2,"active"],
+["IAN","Isaiah Likely","BAL","FA","TE",3,2.0,1,"active"],
+["JIMMY","Nico Collins","HOU","FA","WR",4,12.0,2,"active"],
+["RYAN","Jayden Higgins","HOU","ROOKIE","WR",3,2.0,2,"active"],
+["PAUL","Ben Sinnot","WAS","ROOKIE","TE",3,2.0,1,"active"],
+["JOSH","TERRY McLARIN","WAS","FA","WR",4,3.0,2,"active"],
+["JOSH","Dylan Sampson","CLE","ROOKIE","RB",3,2.0,2,"active"],
+["COLLIN","Fernando Mendoza","","ROOKIE","QB",3,16.0,3,"active"],
+["COLLIN","Keenan Allen","CHI","FA","WR",4,8.0,2,"active"],
+["IAN","Drake London","ATL","RFA","WR",2,17.0,1,"active"],
+["JIMMY","Trey Benson","ARI","ROOKIE","RB",3,4.0,1,"active"],
+["JIMMY","Elijah Sarratt","","ROOKIE","WR",3,4.0,3,"active"],
+["RYAN","Xavier Legette","CAR","ROOKIE","WR",3,2.0,3,"active"],
+["FINCHER","Raheem Mostert","LV","FA","RB",4,1.0,3,"active"],
+["BUB","Elic Ayomanor","TEN","WAIVERS","WR",1,2.0,1,"active"],
+["BUB","Max Klare","","ROOKIE","TE",3,1.0,3,"active"],
+["JOSH","Tee Higgins","#REF!","EXTENSION","WR",6,27.0,1,"active"],
+["JOSH","Jayden Daniels","WAS","ROOKIE","QB",3,14.0,1,"active"],
+["COLLIN","Troy Franklin","DEN","ROOKIE","WR",3,1.0,1,"active"],
+["COLLIN","Mike Washington","","ROOKIE","WR",3,1.0,3,"active"],
+["IAN","Garret Wilson","NYJ","RFA","WR",2,17.0,1,"active"],
+["IAN","Treveyon Henderson","NE","ROOKIE","RB",3,9.0,2,"active"],
+["IAN","Kenyon Sadiq","","ROOKIE","TE",3,9.0,3,"active"],
+["IAN","Drake Maye","","ROOKIE","QB",3,8.0,1,"taxi"],
+["JIMMY","KC Concepcion","","ROOKIE","WR",3,11.0,3,"active"],
+["JIMMY","JA'lynn Polk","NE","ROOKIE","WR",3,2.0,1,"active"],
+["RYAN","Tua Tagovailoa","MIA","FA","QB",3,11.0,3,"active"],
+["FINCHER","Daniel Carlson","LV","FA","PK",4,1.0,3,"active"],
+["FINCHER","Darnell Mooney","ATL","FA","WR",4,1.0,3,"active"],
+["FINCHER","James Conner","ARI","FA","RB",4,13.0,2,"active"],
+["BUB","Quinshon Judkins","CLE","ROOKIE","RB",3,12.0,2,"active"],
+["BUB","Rome Odunze","CHI","ROOKIE","WR",3,11.0,1,"active"],
+["PAUL","Harold Fannin","CLE","ROOKIE","TE",3,2.0,2,"active"],
+["JOSH","Bucky Irving","TB","ROOKIE","RB",3,1.0,1,"active"],
+["COLLIN","Cam Ward","TEN","ROOKIE","QB",3,15.0,2,"active"],
+["COLLIN","Jake Ferguson","DAL","FA","TE",4,12.0,2,"active"],
+["COLLIN","Keon Coleman","BUF","ROOKIE","WR",3,6.0,1,"active"],
+["IAN","Zachariah Branch","","ROOKIE","WR",3,2.0,3,"active"],
+["JIMMY","Joe Burrow","#REF!","EXTENSION","QB",6,10.0,1,"active"],
+["JIMMY","Shedeur Sanders","CLE","ROOKIE","QB",3,2.0,3,"active"],
+["RYAN","Jonathan Brooks","CAR","ROOKIE","RB",3,10.0,1,"active"],
+["RYAN","Brock Purdy","SF","FA","QB",3,7.0,1,"active"],
+["RYAN","Malachi Fields","","ROOKIE","WR",3,2.0,3,"active"],
+["FINCHER","David Njoku","CLE","FA","TE",4,6.0,2,"active"],
+["FINCHER","Jalen Royals","KC","ROOKIE","WR",3,1.0,2,"active"],
+["FINCHER","Josh Allen","BUF","EXTENSION","QB",6,30.0,1,"active"],
+["FINCHER","Jadarian Price","","ROOKIE","RB",3,13.0,3,"active"],
+["FINCHER","Omar Cooper JR.","","ROOKIE","WR",3,6.0,3,"active"],
+["FINCHER","DE'zhaun Stribling","","ROOKIE","WR",3,2.0,3,"active"],
+["FINCHER","Carson Beck","","ROOKIE","QB",3,1.0,3,"active"],
+["BUB","Amon-ra ST. Brown","DET","FRANCHISE TAG 1","WR",1,32.0,1,"active"],
+["BUB","Jonathan Taylor","IND","FA","RB",2,29.0,1,"active"],
+["BUB","Travis Hunter","JAX","ROOKIE","WR",3,11.0,2,"active"],
+["BUB","Jack Bech","LV","ROOKIE","WR",3,2.0,2,"active"],
+["BUB","Ricky Pearsall","SF","ROOKIE","WR",3,2.0,1,"active"],
+["BUB","Bhayshul Tuten","JAX","ROOKIE","RB",3,1.0,2,"active"],
+["PAUL","Luther Burden","CHI","ROOKIE","WR",3,2.0,2,"active"],
+["PAUL","Ray Davis","BUF","ROOKIE","RB",3,1.0,1,"active"],
+["PAUL","Ted Hurst","","ROOKIE","WR",3,1.0,3,"active"],
+["JOSH","Deebo Samuel","SFO","FA","WR",3,13.0,1,"active"],
+["JOSH","Devin Neal","NO","ROOKIE","RB",3,1.0,2,"active"],
+["JOSH","Tucker Kraft","GB","FA","TE",2,1.0,1,"active"]
+];
+
+// owner, name, nflTeam, acq, pos, contractYears, salary, yearsRemaining, status
+const rosterPlayersStatic = ROSTER_RAW.map((r,i)=>({
+  id:"ros"+i, owner:r[0], name:r[1], nflTeam:r[2], acq:r[3], pos:r[4],
+  contractYears:r[5], salary:r[6], yearsRemaining:r[7], status:r[8]
+}));
+
+
 /* =========================================================
    LOCAL MIRROR (populated by Firebase listeners)
    ========================================================= */
 const mirror = {
-  teams: {},           // teamId -> {cap, startCap, signings, claimedBy}
+  teams: {},           // teamId -> {cap, startCap, signings, claimedBy, futureCapHits, usedExtensionThisSeason, usedFranchiseTagThisSeason, seasonsUnder50Floor}
   rfa: { activePlayerId:null, meta:{}, status:{} },   // all PUBLIC (no $ amounts)
   fa: { activePlayerId:null, meta:{}, status:{}, customPlayers:{} },  // all PUBLIC
+  rosters: {},          // teamId -> { pid -> {name,pos,nflTeam,acq,contractYears,salary,yearsRemaining,status,franchiseTagsUsed,extensionsUsed} }
   ready:false
 };
 // Private $ amounts, fetched/cached on demand since Firebase rules won't
@@ -400,9 +566,39 @@ function startListeners(){
   Object.keys(OWNERS).forEach(tid=>{
     get(ref(db, `${ROOT}/teams/${tid}`)).then(snap=>{
       if(!snap.exists()){
-        set(ref(db, `${ROOT}/teams/${tid}`), {cap:START_CAP[tid], startCap:START_CAP[tid], signings:{}, claimedBy:null});
+        set(ref(db, `${ROOT}/teams/${tid}`), {
+          cap:START_CAP[tid], startCap:START_CAP[tid], signings:{}, claimedBy:null,
+          futureCapHits:{plus1:0, plus2:0, plus3plus:0},
+          usedExtensionThisSeason:false, usedFranchiseTagThisSeason:false,
+          seasonsUnder50Floor:0
+        });
+      } else {
+        // backfill new fields on teams created before roster management existed
+        const v = snap.val();
+        const patch = {};
+        if(v.futureCapHits===undefined) patch.futureCapHits = {plus1:0, plus2:0, plus3plus:0};
+        if(v.usedExtensionThisSeason===undefined) patch.usedExtensionThisSeason = false;
+        if(v.usedFranchiseTagThisSeason===undefined) patch.usedFranchiseTagThisSeason = false;
+        if(v.seasonsUnder50Floor===undefined) patch.seasonsUnder50Floor = 0;
+        if(Object.keys(patch).length) update(ref(db, `${ROOT}/teams/${tid}`), patch);
       }
     });
+  });
+  // seed the full 155-player roster once, if not already present
+  get(ref(db, `${ROOT}/rosters`)).then(snap=>{
+    if(!snap.exists()){
+      const seed = {};
+      rosterPlayersStatic.forEach(p=>{
+        if(!seed[p.owner]) seed[p.owner] = {};
+        seed[p.owner][p.id] = {
+          name:p.name, pos:p.pos, nflTeam:p.nflTeam, acq:p.acq,
+          contractYears:p.contractYears, salary:p.salary, yearsRemaining:p.yearsRemaining,
+          status:p.status, franchiseTagsUsed: p.acq==='FRANCHISE TAG 1'?1:0,
+          extensionsUsed: p.acq==='EXTENSION'?1:0
+        };
+      });
+      set(ref(db, `${ROOT}/rosters`), seed);
+    }
   });
   onValue(ref(db, `${ROOT}/teams`), snap=>{
     mirror.teams = snap.val() || {};
@@ -410,6 +606,7 @@ function startListeners(){
     if(!myTeam) renderTeamPick();
     renderAll();
   });
+  onValue(ref(db, `${ROOT}/rosters`), snap=>{ mirror.rosters = snap.val() || {}; renderAll(); });
   // rfa/fa: only PUBLIC data (activePlayerId, meta, status) is broadly
   // listened to. Actual $ amounts live under /rfa/private and /fa/private
   // and are fetched narrowly via ensurePrivate() — see above.
@@ -431,7 +628,7 @@ window.setPhase = setPhase;
 
 function renderShell(){
   const nav = document.getElementById('nav');
-  const tabs = [["dashboard","Dashboard"],["rfa","RFA Round"],["fa","FA Auction"],["summary","Summary"]];
+  const tabs = [["dashboard","Dashboard"],["rosters","Rosters"],["rfa","RFA Round"],["fa","FA Auction"],["summary","Summary"]];
   nav.innerHTML = tabs.map(([id,label])=>`<button class="${phase===id?'active':''}" onclick="setPhase('${id}')">${label}</button>`).join("");
 
   const ticker = document.getElementById('ticker');
@@ -451,6 +648,7 @@ function renderAll(){ if(!mirror.ready) return; renderShell(); renderApp(); }
 function renderApp(){
   const app = document.getElementById('app');
   if(phase==="dashboard") app.innerHTML = viewDashboard();
+  else if(phase==="rosters") app.innerHTML = viewRosters();
   else if(phase==="rfa") app.innerHTML = viewRFA();
   else if(phase==="fa") app.innerHTML = viewFA();
   else if(phase==="summary") app.innerHTML = viewSummary();
@@ -476,25 +674,195 @@ function viewDashboard(){
   }).join("");
 
   return `
-  <div class="section-head"><div><h2>Offseason Control Room</h2><div class="desc">Live-synced across all 8 owners. Bids stay private to each team until reveal.</div></div></div>
+  <div class="section-head"><div><h2>Front Office</h2><div class="desc">Live-synced across all 8 owners. This offseason's draft and free agency are wrapped — roster management is the focus now.</div></div></div>
   <div class="grid-2" style="margin-bottom:26px;">
     <div class="plaque"><div class="bc2"></div><div class="bc3"></div>
-      <div class="eyebrow-label">Step 1 · Restricted Free Agency</div>
-      <h3 style="margin:4px 0 6px;font-size:22px;">Retain or release your RFAs first</h3>
-      <p style="color:var(--muted);font-size:13px;line-height:1.6;margin:0 0 16px;">${rfaPending} of ${rfaPlayers.length} restricted free agents still need resolving.</p>
-      <button class="btn turf" onclick="setPhase('rfa')">${rfaPending? 'Enter RFA Round' : 'Review RFA Results'}</button>
+      <div class="eyebrow-label">Roster Management</div>
+      <h3 style="margin:4px 0 6px;font-size:22px;">Cuts, extensions, and franchise tags</h3>
+      <p style="color:var(--muted);font-size:13px;line-height:1.6;margin:0 0 16px;">Manage your 26-man roster with automatic dead-cap, extension, and tag math.</p>
+      <button class="btn turf" onclick="setPhase('rosters')">Open Rosters</button>
     </div>
     <div class="plaque"><div class="bc2"></div><div class="bc3"></div>
-      <div class="eyebrow-label">Step 2 · Open Free Agency</div>
-      <h3 style="margin:4px 0 6px;font-size:22px;">Auction the open market</h3>
-      <p style="color:var(--muted);font-size:13px;line-height:1.6;margin:0 0 16px;">${faPending} of ${faList.length} free agents remain unsigned.</p>
-      <button class="btn ghost" onclick="setPhase('fa')">${faPending? 'Enter FA Auction' : 'Review FA Results'}</button>
+      <div class="eyebrow-label">Reference · This Offseason's Moves</div>
+      <h3 style="margin:4px 0 6px;font-size:22px;">RFA &amp; FA history</h3>
+      <p style="color:var(--muted);font-size:13px;line-height:1.6;margin:0 0 16px;">${rfaPending===0 && faPending===0? 'Draft and free agency are complete for this offseason.' : `${rfaPending} RFA · ${faPending} FA still open from this offseason's process.`}</p>
+      <button class="btn ghost" onclick="setPhase('summary')">View Summary</button>
     </div>
   </div>
   <div class="section-head"><h2 style="font-size:18px;">Team Cap Space</h2></div>
   <div class="grid-3">${teamCards}</div>
   `;
 }
+
+/* =========================================================
+   ROSTER MANAGEMENT
+   ========================================================= */
+let rosterUI = { viewTeam: null, actionPid: null, actionType: null };
+
+function teamRoster(tid){ return mirror.rosters[tid] || {}; }
+function activePlayers(tid){
+  return Object.entries(teamRoster(tid)).filter(([,p])=>p.status!=='cut').map(([id,p])=>({id,...p}));
+}
+function teamTotalYears(tid){ return activePlayers(tid).reduce((s,p)=>s+(p.yearsRemaining||0),0); }
+function leagueTop3AtPos(pos){
+  const all = [];
+  Object.keys(OWNERS).forEach(tid=>{
+    activePlayers(tid).forEach(p=>{ if(p.pos===pos) all.push(p.salary); });
+  });
+  return all.sort((a,b)=>b-a).slice(0,3);
+}
+function computeExtension(salary){ return Math.max(10, Math.round(salary*1.5*100)/100); }
+function computeTag(pid, pos, salary){
+  const top3 = leagueTop3AtPos(pos);
+  const avg = top3.length? Math.round((top3.reduce((a,b)=>a+b,0)/top3.length)*100)/100 : salary;
+  const isTop3 = top3.length>0 && salary >= top3[top3.length-1] && top3.includes(salary);
+  return isTop3 ? Math.round(salary*1.15*100)/100 : avg;
+}
+function computeDeadCap(salary, yearsRemaining){
+  let plus1=0, plus2=0, plus3plus=0;
+  if(yearsRemaining>=1) plus1 = Math.round(salary*0.5*100)/100;
+  if(yearsRemaining>=2) plus2 = Math.round(salary*0.35*100)/100;
+  if(yearsRemaining>2) plus3plus = Math.round(salary*0.25*(yearsRemaining-2)*100)/100;
+  return {plus1, plus2, plus3plus, total: Math.round((plus1+plus2+plus3plus)*100)/100};
+}
+
+function viewRosters(){
+  if(!rosterUI.viewTeam) rosterUI.viewTeam = myTeam;
+  const vt = rosterUI.viewTeam;
+  const isMine = vt === myTeam;
+  const team = mirror.teams[vt] || {cap:START_CAP[vt], startCap:START_CAP[vt]};
+  const roster = activePlayers(vt).sort((a,b)=> (a.pos>b.pos?1:-1) || b.salary-a.salary);
+  const totalYears = teamTotalYears(vt);
+  const under50 = totalYears < 50;
+  const fch = team.futureCapHits || {plus1:0,plus2:0,plus3plus:0};
+
+  const teamTabs = Object.keys(OWNERS).map(tid=>
+    `<button class="btn small ${tid===vt?'':'ghost'}" style="margin:0 6px 6px 0;" onclick="switchRosterTeam('${tid}')">${OWNERS[tid]}${tid===myTeam?' (you)':''}</button>`
+  ).join("");
+
+  const rows = roster.map(p=>{
+    const finalYear = p.yearsRemaining<=1;
+    const canExtend = isMine && finalYear && p.acq!=='ROOKIE' && !team.usedExtensionThisSeason;
+    const canTag = isMine && finalYear && !team.usedFranchiseTagThisSeason && (p.franchiseTagsUsed||0)<2;
+    const acting = rosterUI.actionPid===p.id;
+    let actionRow = '';
+    if(isMine){
+      actionRow = `<div class="btnrow" style="gap:6px;">
+        <button class="btn small alert" onclick="openRosterAction('${p.id}','cut')">Cut</button>
+        <button class="btn small ${canExtend?'turf':'ghost'}" ${canExtend?'':'disabled'} onclick="openRosterAction('${p.id}','extend')">Extend</button>
+        <button class="btn small ${canTag?'':'ghost'}" ${canTag?'':'disabled'} onclick="openRosterAction('${p.id}','tag')">Tag</button>
+      </div>`;
+    }
+    let panel = '';
+    if(acting && rosterUI.actionType==='cut'){
+      const dc = computeDeadCap(p.salary, p.yearsRemaining);
+      panel = `<tr><td colspan="7"><div class="card" style="margin:6px 0;">
+        <div class="eyebrow-label">Cut ${p.name} — Dead Cap Preview</div>
+        <p style="font-size:13px;color:var(--muted);margin:4px 0 10px;">Frees ${money(p.salary)} from this year's cap immediately. Dead cap lands on future seasons:</p>
+        <div class="discount-note" style="font-size:13px;">Next season: ${money(dc.plus1)} &nbsp;·&nbsp; Season after: ${money(dc.plus2)} &nbsp;·&nbsp; Beyond that: ${money(dc.plus3plus)} &nbsp;·&nbsp; <b>Total dead cap: ${money(dc.total)}</b></div>
+        <div class="btnrow" style="margin-top:12px;"><button class="btn small alert" onclick="confirmCut('${p.id}')">Confirm Cut</button><button class="btn small ghost" onclick="closeRosterAction()">Cancel</button></div>
+      </div></td></tr>`;
+    } else if(acting && rosterUI.actionType==='extend'){
+      const newSal = computeExtension(p.salary);
+      panel = `<tr><td colspan="7"><div class="card" style="margin:6px 0;">
+        <div class="eyebrow-label">Extend ${p.name}</div>
+        <p style="font-size:13px;color:var(--muted);margin:4px 0 10px;">New salary ${money(newSal)}/yr for 2 more years (this final year + 1 extra). One extension per team per season.</p>
+        <div class="btnrow"><button class="btn small turf" onclick="confirmExtend('${p.id}')">Confirm Extension</button><button class="btn small ghost" onclick="closeRosterAction()">Cancel</button></div>
+      </div></td></tr>`;
+    } else if(acting && rosterUI.actionType==='tag'){
+      const tagSal = computeTag(p.id, p.pos, p.salary);
+      panel = `<tr><td colspan="7"><div class="card" style="margin:6px 0;">
+        <div class="eyebrow-label">Franchise Tag ${p.name}</div>
+        <p style="font-size:13px;color:var(--muted);margin:4px 0 10px;">Tag salary: ${money(tagSal)}/yr (top-3 ${p.pos} average, or +15% if already top-3 paid). One per team per season, max 2 per player lifetime. Tags used so far: ${p.franchiseTagsUsed||0}/2.</p>
+        <div class="btnrow"><button class="btn small turf" onclick="confirmTag('${p.id}')">Confirm Tag</button><button class="btn small ghost" onclick="closeRosterAction()">Cancel</button></div>
+      </div></td></tr>`;
+    }
+    return `<tr>
+      <td>${p.name}${p.status==='taxi'?' <span class="tag fa">TAXI</span>':''}${p.status==='ir'?' <span class="tag rfa-lost">IR</span>':''}</td>
+      <td>${p.pos}</td><td>${p.nflTeam||'—'}</td>
+      <td class="mono">${money(p.salary)}</td>
+      <td class="mono">${p.yearsRemaining}${finalYear?' <span style="color:var(--gold-bright);">(final)</span>':''}</td>
+      <td style="font-size:11px;color:var(--muted);">${p.acq}</td>
+      <td>${actionRow}</td>
+    </tr>${panel}`;
+  }).join("");
+
+  return `
+  <div class="section-head"><div><h2>Rosters</h2><div class="desc">Cuts, extensions, and franchise tags apply league rules automatically. You can only act on your own roster.</div></div></div>
+  <div style="margin-bottom:14px;">${teamTabs}</div>
+  <div class="grid-2" style="margin-bottom:22px;">
+    <div class="card">
+      <div class="eyebrow-label">${OWNERS[vt]} — Cap Snapshot</div>
+      <div class="led led-lg" style="font-size:30px;">${money(team.cap)} <span style="font-size:14px;color:var(--muted);">available this season</span></div>
+      <div class="discount-note">Future dead cap on the books — next season: ${money(fch.plus1)} · season after: ${money(fch.plus2)} · beyond: ${money(fch.plus3plus)}</div>
+    </div>
+    <div class="card">
+      <div class="eyebrow-label">50-Contract-Year Floor</div>
+      <div class="led led-lg" style="font-size:30px;color:${under50?'var(--alert-bright)':'var(--gold-bright)'};">${totalYears} <span style="font-size:14px;color:var(--muted);">years on roster</span></div>
+      <div class="discount-note">${under50? `Below the 50-year floor. Seasons under 50 so far: ${team.seasonsUnder50Floor||0}/2 (2 consecutive is a violation).` : 'Meets the league-wide 50-year minimum.'}</div>
+    </div>
+  </div>
+  <div class="card">
+    <table>
+      <thead><tr><th>Player</th><th>Pos</th><th>NFL</th><th>Salary</th><th>Yrs Left</th><th>Acq</th><th></th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  </div>
+  `;
+}
+function switchRosterTeam(tid){ rosterUI = {viewTeam:tid, actionPid:null, actionType:null}; renderApp(); }
+window.switchRosterTeam = switchRosterTeam;
+function openRosterAction(pid, type){ rosterUI.actionPid=pid; rosterUI.actionType=type; renderApp(); }
+window.openRosterAction = openRosterAction;
+function closeRosterAction(){ rosterUI.actionPid=null; rosterUI.actionType=null; renderApp(); }
+window.closeRosterAction = closeRosterAction;
+
+async function confirmCut(pid){
+  const tid = myTeam;
+  const p = teamRoster(tid)[pid];
+  const dc = computeDeadCap(p.salary, p.yearsRemaining);
+  const teamSnap = await get(ref(db, `${ROOT}/teams/${tid}`));
+  const team = teamSnap.val();
+  const fch = team.futureCapHits || {plus1:0,plus2:0,plus3plus:0};
+  await update(ref(db, `${ROOT}/rosters/${tid}/${pid}`), {status:'cut', yearsRemaining:0});
+  await runTransaction(ref(db, `${ROOT}/teams/${tid}/cap`), cur => (cur==null?team.cap:cur) + p.salary);
+  await update(ref(db, `${ROOT}/teams/${tid}/futureCapHits`), {
+    plus1: Math.round((fch.plus1+dc.plus1)*100)/100,
+    plus2: Math.round((fch.plus2+dc.plus2)*100)/100,
+    plus3plus: Math.round((fch.plus3plus+dc.plus3plus)*100)/100
+  });
+  toast(`${p.name} cut — ${money(dc.total)} dead cap on the books`);
+  closeRosterAction();
+}
+async function confirmExtend(pid){
+  const tid = myTeam;
+  const p = teamRoster(tid)[pid];
+  const newSal = computeExtension(p.salary);
+  const delta = Math.round((newSal - p.salary)*100)/100;
+  const teamSnap = await get(ref(db, `${ROOT}/teams/${tid}`));
+  const team = teamSnap.val();
+  if(delta > team.cap){ toast(`Not enough cap room for this extension (needs ${money(delta)} more)`); return; }
+  await update(ref(db, `${ROOT}/rosters/${tid}/${pid}`), {salary:newSal, yearsRemaining:2, extensionsUsed:(p.extensionsUsed||0)+1});
+  await runTransaction(ref(db, `${ROOT}/teams/${tid}/cap`), cur => (cur==null?team.cap:cur) - delta);
+  await set(ref(db, `${ROOT}/teams/${tid}/usedExtensionThisSeason`), true);
+  toast(`${p.name} extended — ${money(newSal)}/yr for 2 years`);
+  closeRosterAction();
+}
+async function confirmTag(pid){
+  const tid = myTeam;
+  const p = teamRoster(tid)[pid];
+  const tagSal = computeTag(pid, p.pos, p.salary);
+  const delta = Math.round((tagSal - p.salary)*100)/100;
+  const teamSnap = await get(ref(db, `${ROOT}/teams/${tid}`));
+  const team = teamSnap.val();
+  if(delta > team.cap){ toast(`Not enough cap room for this tag (needs ${money(delta)} more)`); return; }
+  await update(ref(db, `${ROOT}/rosters/${tid}/${pid}`), {salary:tagSal, yearsRemaining:1, franchiseTagsUsed:(p.franchiseTagsUsed||0)+1});
+  await runTransaction(ref(db, `${ROOT}/teams/${tid}/cap`), cur => (cur==null?team.cap:cur) - delta);
+  await set(ref(db, `${ROOT}/teams/${tid}/usedFranchiseTagThisSeason`), true);
+  toast(`${p.name} franchise tagged — ${money(tagSal)}/yr`);
+  closeRosterAction();
+}
+window.confirmCut=confirmCut; window.confirmExtend=confirmExtend; window.confirmTag=confirmTag;
 
 /* =========================================================
    RFA ROUND
